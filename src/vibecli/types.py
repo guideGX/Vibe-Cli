@@ -18,4 +18,12 @@ class Message:
 
 @dataclass(slots=True)
 class Usage:
-    input_tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+@dataclass(slots=True)
+class QueryResult:
+    text: str
+    total_tokens: int
+    turns: int
