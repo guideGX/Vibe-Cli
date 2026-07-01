@@ -73,4 +73,47 @@ def write_chrome_devtools_config(
 
 def _read_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
-        return None
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _spec_from_raw(name: str, raw: dict[str, Any], project_root: Path) -> McpServerSpec:
+    default_type = "streamable_http" if raw.get("url") else "stdio"
+    server_type = str(raw.get("type") or raw.get("transport") or default_type)
+    env = {
+        key: _expand(str(value), project_root) for key, value in dict(raw.get("env") or {}).items()
+    }
+    args = [_expand(str(arg), project_root) for arg in raw.get("args") or []]
+    cwd = raw.get("cwd")
+    return McpServerSpec(
+        name=name,
+        type=server_type,
+        command=_expand(str(raw["command"]), project_root) if raw.get("command") else None,
+        args=args,
+        env=env,
+        cwd=_expand(str(cwd), project_root) if cwd else None,
+        url=_expand(str(raw["url"]), project_root) if raw.get("url") else None,
+        headers={
+            key: _expand(str(value), project_root)
+            for key, value in dict(raw.get("headers") or {}).items()
+        },
+        enabled=bool(raw.get("enabled", True)),
+        timeout=float(raw.get("timeout", raw.get("startup_timeout", 30.0)) or 30.0),
+    )
+
+
+def _expand(value: str, project_root: Path) -> str:
+    replacements = {
+        "PROJECT_DIR": str(project_root),
+        "HOME": str(Path.home()),
+    }
+
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        return replacements.get(name, os.environ.get(name, ""))
+
+    return re.sub(r"\$\{([^}]+)\}", replace, value)
