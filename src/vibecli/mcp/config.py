@@ -116,4 +116,4 @@ def _expand(value: str, project_root: Path) -> str:
         name = match.group(1)
         return replacements.get(name, os.environ.get(name, ""))
 
-    return re.sub(r"\$\{([^}]+)\}", replace, value)
+    return re.sub(r"\$\{([^}]+)\}", replace, value)
