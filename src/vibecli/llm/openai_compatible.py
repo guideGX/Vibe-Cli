@@ -37,4 +37,33 @@ class OpenAICompatibleClient:
     async def chat(
         self,
         messages: list[Message],
-        tools: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        system_prompt: str,
+    ) -> AsyncIterator[dict[str, Any]]:
+        if not self.api_key:
+            yield {
+                "type": "error",
+                "error": RuntimeError(
+                    "VIBECLI_API_KEY is not configured. Set it in env, ~/.vibecli/config.json, "
+                    "or project .vibecli/config.json."
+                ),
+            }
+            return
+
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": self._format_messages(messages, system_prompt),
+            "stream": True,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+
+        headers = {
+            "authorization": f"Bearer {self.api_key}",
+            "content-type": "application/json",
+            "user-agent": "VibeCLI-Python/0.1.0",
+        }
