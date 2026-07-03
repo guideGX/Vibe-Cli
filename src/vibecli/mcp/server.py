@@ -99,4 +99,12 @@ def serve_http(port: int = 3000, cwd: str | None = None) -> None:
             self.send_response(status)
             self.send_header("content-type", "application/json")
             self.send_header("content-length", str(len(body)))
-            self.end_headers()
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format: str, *args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"VibeCLI MCP server listening on http://127.0.0.1:{port}", flush=True)
+    server.serve_forever()
