@@ -110,4 +110,40 @@ class OpenAICompatibleClient:
     def _format_content(self, content: str | list[dict[str, Any]]) -> str | list[dict[str, Any]]:
         if isinstance(content, str):
             return content
-        if self.supports_images:
+        if self.supports_images:
+            cleaned = []
+            for part in content:
+                item = {key: value for key, value in part.items() if key != "metadata"}
+                cleaned.append(item)
+            return cleaned
+        text_parts = []
+        for part in content:
+            if part.get("type") == "text":
+                text_parts.append(str(part.get("text") or ""))
+            elif part.get("type") == "image_url":
+                metadata = part.get("metadata") or {}
+                source = metadata.get("source", "remote image")
+                width = metadata.get("width", "?")
+                height = metadata.get("height", "?")
+                text_parts.append(f"[Image omitted: {source}, {width}x{height}]")
+        return "\n".join(text_parts)
+
+    async def _parse_chunk(self, chunk: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+        choices = chunk.get("choices") or []
+        if not choices:
+            return
+        choice = choices[0]
+        delta = choice.get("delta") or {}
+
+        reasoning = delta.get("reasoning_content")
+        if isinstance(reasoning, str) and reasoning:
+            yield {"type": "thinking_delta", "thinking": reasoning}
+
+        content = delta.get("content")
+        if isinstance(content, str) and content:
+            yield {"type": "text_delta", "text": content}
+
+        tool_calls = delta.get("tool_calls") or []
+        for tool_call in tool_calls:
+            yield {"type": "tool_call_delta", "tool_call": tool_call}
+
