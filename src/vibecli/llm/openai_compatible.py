@@ -146,4 +146,44 @@ class OpenAICompatibleClient:
         tool_calls = delta.get("tool_calls") or []
         for tool_call in tool_calls:
             yield {"type": "tool_call_delta", "tool_call": tool_call}
-
+
+        finish_reason = choice.get("finish_reason")
+        if finish_reason:
+            yield {"type": "message_end", "stop_reason": _map_finish_reason(str(finish_reason))}
+
+        usage = chunk.get("usage")
+        if isinstance(usage, dict):
+            yield {
+                "type": "usage",
+                "usage": {
+                    "input_tokens": int(usage.get("prompt_tokens") or 0),
+                    "output_tokens": int(usage.get("completion_tokens") or 0),
+                },
+            }
+
+
+async def _iter_sse(response: httpx.Response) -> AsyncIterator[str]:
+    buffer = ""
+    async for text in response.aiter_text():
+        buffer += text
+        while "\n\n" in buffer:
+            event, buffer = buffer.split("\n\n", 1)
+            data_lines = []
+            for line in event.splitlines():
+                line = line.strip()
+                if line.startswith("data:"):
+                    data_lines.append(line[5:].strip())
+            if data_lines:
+                yield "\n".join(data_lines)
+    if buffer.strip():
+        data_lines = []
+        for line in buffer.splitlines():
+            line = line.strip()
+            if line.startswith("data:"):
+                data_lines.append(line[5:].strip())
+        if data_lines:
+            yield "\n".join(data_lines)
+
+
+def _map_finish_reason(reason: str) -> str:
+    if reason in {"tool_calls", "tool_use"}:
