@@ -186,4 +186,10 @@ async def _iter_sse(response: httpx.Response) -> AsyncIterator[str]:
 
 
 def _map_finish_reason(reason: str) -> str:
-    if reason in {"tool_calls", "tool_use"}:
+    if reason in {"tool_calls", "tool_use"}:
+        return "tool_use"
+    if reason == "length":
+        return "max_tokens"
+    if reason == "content_filter":
+        return "stop_sequence"
+    return "end_turn"
