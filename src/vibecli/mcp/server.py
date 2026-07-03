@@ -70,4 +70,33 @@ async def serve_stdio(cwd: str | None = None) -> None:
     root = str(Path(cwd or ".").resolve())
     loop = asyncio.get_running_loop()
     while True:
-        line = await loop.run_in_executor(None, input)
+        line = await loop.run_in_executor(None, input)
+        try:
+            request = json.loads(line)
+            response = await _handle_request(request, root)
+        except EOFError:
+            break
+        except Exception as exc:  # noqa: BLE001
+            response = {"jsonrpc": "2.0", "error": {"message": str(exc)}}
+        print(json.dumps(response, ensure_ascii=False), flush=True)
+
+
+def serve_http(port: int = 3000, cwd: str | None = None) -> None:
+    root = str(Path(cwd or ".").resolve())
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802 - stdlib API
+            length = int(self.headers.get("content-length") or 0)
+            raw = self.rfile.read(length).decode("utf-8")
+            try:
+                request = json.loads(raw)
+                response = asyncio.run(_handle_request(request, root))
+                status = 200
+            except Exception as exc:  # noqa: BLE001
+                response = {"jsonrpc": "2.0", "error": {"message": str(exc)}}
+                status = 200
+            body = json.dumps(response, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
