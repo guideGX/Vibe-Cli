@@ -66,4 +66,48 @@ class OpenAICompatibleClient:
             "authorization": f"Bearer {self.api_key}",
             "content-type": "application/json",
             "user-agent": "VibeCLI-Python/0.1.0",
-        }
+        }
+        url = self.base_url.rstrip("/") + "/chat/completions"
+
+        yield {"type": "message_start", "model": self.model}
+        async with (
+            httpx.AsyncClient(timeout=self.timeout, http2=False) as client,
+            client.stream("POST", url, headers=headers, json=payload) as response,
+        ):
+            response.raise_for_status()
+            async for event in _iter_sse(response):
+                if event == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(event)
+                except json.JSONDecodeError:
+                    continue
+                async for parsed in self._parse_chunk(chunk):
+                    yield parsed
+
+    def _format_messages(self, messages: list[Message], system_prompt: str) -> list[dict[str, Any]]:
+        formatted: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        for message in messages:
+            if message.role == "tool":
+                formatted.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": message.tool_call_id or "",
+                        "content": str(message.content),
+                    }
+                )
+            elif message.role == "assistant":
+                item: dict[str, Any] = {"role": "assistant", "content": message.content or ""}
+                if message.tool_calls:
+                    item["tool_calls"] = message.tool_calls
+                formatted.append(item)
+            else:
+                formatted.append(
+                    {"role": message.role, "content": self._format_content(message.content)}
+                )
+        return formatted
+
+    def _format_content(self, content: str | list[dict[str, Any]]) -> str | list[dict[str, Any]]:
+        if isinstance(content, str):
+            return content
+        if self.supports_images:
