@@ -43,4 +43,29 @@ class McpClientManager:
             return list(result.tools)
 
     async def call_server_tool(
-        self,
+        self,
+        spec: McpServerSpec,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> ToolResult:
+        async with self._session(spec) as session:
+            result = await session.call_tool(
+                tool_name,
+                arguments,
+                read_timeout_seconds=timedelta(seconds=spec.timeout),
+            )
+        return ToolResult(content=_content_to_text(result.content), is_error=bool(result.isError))
+
+    async def list_resources(self, spec: McpServerSpec) -> ToolResult:
+        async with self._session(spec) as session:
+            result = await session.list_resources()
+        lines = [
+            f"{resource.uri} {resource.name or ''} {resource.description or ''}".strip()
+            for resource in result.resources
+        ]
+        return ToolResult("\n".join(lines) or "(no resources)")
+
+    async def read_resource(self, spec: McpServerSpec, uri: str) -> ToolResult:
+        async with self._session(spec) as session:
+            result = await session.read_resource(AnyUrl(uri))
+        return ToolResult(_content_to_text(result.contents))
