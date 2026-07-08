@@ -222,4 +222,24 @@ class McpClientManager:
             ):
                 await session.initialize()
                 yield session
-            return
+            return
+        raise ValueError(f"Unsupported MCP transport: {spec.type}")
+
+
+def _content_to_text(content: Any) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(filter(None, (_content_to_text(item) for item in content)))
+    if hasattr(content, "text"):
+        return str(content.text)
+    if hasattr(content, "data") and hasattr(content, "mimeType"):
+        data = str(content.data)
+        return f"[image {content.mimeType} base64 chars={len(data)}]"
+    if hasattr(content, "resource"):
+        return _content_to_text(content.resource)
+    if hasattr(content, "model_dump"):
+        return json.dumps(content.model_dump(mode="json"), ensure_ascii=False)
+    return str(content)
