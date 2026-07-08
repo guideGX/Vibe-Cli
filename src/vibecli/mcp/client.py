@@ -136,4 +136,36 @@ class McpClientManager:
                 parameters=object_schema({}),
                 handler=list_handler,
                 is_read_only=True,
-            ),
+            ),
+            Tool(
+                name=f"mcp__{spec.name}__read_resource",
+                description=f"Read an MCP resource from {spec.name}.",
+                parameters=object_schema(
+                    {"uri": {"type": "string", "description": "Resource URI"}},
+                    ["uri"],
+                ),
+                required_keys=["uri"],
+                handler=read_handler,
+                is_read_only=True,
+            ),
+        ]
+
+    def _virtual_prompt_tools(self, spec: McpServerSpec) -> list[Tool]:
+        async def list_handler(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+            _ = payload, context
+            return await self.list_prompts(spec)
+
+        async def get_handler(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+            _ = context
+            arguments = payload.get("arguments")
+            if arguments is not None and not isinstance(arguments, dict):
+                return ToolResult("arguments must be an object", is_error=True)
+            return await self.get_prompt(
+                spec,
+                str(payload["name"]),
+                {str(k): str(v) for k, v in (arguments or {}).items()},
+            )
+
+        return [
+            Tool(
+                name=f"mcp__{spec.name}__list_prompts",
