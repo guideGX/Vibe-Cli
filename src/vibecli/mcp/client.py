@@ -168,4 +168,31 @@ class McpClientManager:
 
         return [
             Tool(
-                name=f"mcp__{spec.name}__list_prompts",
+                name=f"mcp__{spec.name}__list_prompts",
+                description=f"List MCP prompts from {spec.name}.",
+                parameters=object_schema({}),
+                handler=list_handler,
+                is_read_only=True,
+            ),
+            Tool(
+                name=f"mcp__{spec.name}__get_prompt",
+                description=f"Get an MCP prompt from {spec.name}.",
+                parameters=object_schema(
+                    {
+                        "name": {"type": "string", "description": "Prompt name"},
+                        "arguments": {"type": "object", "description": "Prompt arguments"},
+                    },
+                    ["name"],
+                ),
+                required_keys=["name"],
+                handler=get_handler,
+                is_read_only=True,
+            ),
+        ]
+
+    @asynccontextmanager
+    async def _session(self, spec: McpServerSpec):
+        if spec.type in {"stdio", "local"}:
+            if not spec.command:
+                raise ValueError(f"MCP server {spec.name} is missing command")
+            params = StdioServerParameters(
