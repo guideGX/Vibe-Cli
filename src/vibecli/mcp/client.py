@@ -92,4 +92,48 @@ class McpClientManager:
         for remote_tool in remote_tools:
             tool_name = str(remote_tool.name)
             local_name = f"mcp__{spec.name}__{tool_name}"
-            schema = remote_tool.inputSchema or object_schema({})
+            schema = remote_tool.inputSchema or object_schema({})
+            annotations = getattr(remote_tool, "annotations", None)
+            read_only = bool(getattr(annotations, "readOnlyHint", False))
+
+            async def handler(
+                payload: dict[str, Any],
+                context: ToolContext,
+                *,
+                server_spec: McpServerSpec = spec,
+                remote_name: str = tool_name,
+            ) -> ToolResult:
+                _ = context
+                return await self.call_server_tool(server_spec, remote_name, payload)
+
+            wrapped.append(
+                Tool(
+                    name=local_name,
+                    description=remote_tool.description or f"MCP tool {tool_name}",
+                    parameters=schema,
+                    handler=handler,
+                    is_read_only=read_only,
+                    is_concurrency_safe=False,
+                    danger_level="safe" if read_only else "medium",
+                    requires_approval=not read_only,
+                )
+            )
+        return wrapped
+
+    def _virtual_resource_tools(self, spec: McpServerSpec) -> list[Tool]:
+        async def list_handler(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+            _ = payload, context
+            return await self.list_resources(spec)
+
+        async def read_handler(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+            _ = context
+            return await self.read_resource(spec, str(payload["uri"]))
+
+        return [
+            Tool(
+                name=f"mcp__{spec.name}__list_resources",
+                description=f"List MCP resources from {spec.name}.",
+                parameters=object_schema({}),
+                handler=list_handler,
+                is_read_only=True,
+            ),
