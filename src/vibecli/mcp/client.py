@@ -68,4 +68,28 @@ class McpClientManager:
     async def read_resource(self, spec: McpServerSpec, uri: str) -> ToolResult:
         async with self._session(spec) as session:
             result = await session.read_resource(AnyUrl(uri))
-        return ToolResult(_content_to_text(result.contents))
+        return ToolResult(_content_to_text(result.contents))
+
+    async def list_prompts(self, spec: McpServerSpec) -> ToolResult:
+        async with self._session(spec) as session:
+            result = await session.list_prompts()
+        lines = [f"{prompt.name} {prompt.description or ''}".strip() for prompt in result.prompts]
+        return ToolResult("\n".join(lines) or "(no prompts)")
+
+    async def get_prompt(
+        self,
+        spec: McpServerSpec,
+        name: str,
+        arguments: dict[str, str] | None = None,
+    ) -> ToolResult:
+        async with self._session(spec) as session:
+            result = await session.get_prompt(name, arguments or {})
+        return ToolResult(_content_to_text(result.messages))
+
+    async def _tools_for_server(self, spec: McpServerSpec) -> list[Tool]:
+        remote_tools = await self.list_server_tools(spec)
+        wrapped: list[Tool] = []
+        for remote_tool in remote_tools:
+            tool_name = str(remote_tool.name)
+            local_name = f"mcp__{spec.name}__{tool_name}"
+            schema = remote_tool.inputSchema or object_schema({})
