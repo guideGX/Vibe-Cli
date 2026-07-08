@@ -195,4 +195,31 @@ class McpClientManager:
         if spec.type in {"stdio", "local"}:
             if not spec.command:
                 raise ValueError(f"MCP server {spec.name} is missing command")
-            params = StdioServerParameters(
+            params = StdioServerParameters(
+                command=spec.command,
+                args=spec.args,
+                env={**os.environ, **spec.env},
+                cwd=spec.cwd or self.project_root,
+            )
+            with open(os.devnull, "w", encoding="utf-8") as errlog:
+                async with (
+                    stdio_client(params, errlog=errlog) as (read, write),
+                    ClientSession(read, write) as session,
+                ):
+                    await session.initialize()
+                    yield session
+            return
+        if spec.type in {"http", "streamable_http", "streamable-http"}:
+            if not spec.url:
+                raise ValueError(f"MCP server {spec.name} is missing url")
+            async with (
+                streamablehttp_client(
+                    spec.url,
+                    headers=spec.headers or None,
+                    timeout=spec.timeout,
+                ) as (read, write, _session_id),
+                ClientSession(read, write) as session,
+            ):
+                await session.initialize()
+                yield session
+            return
