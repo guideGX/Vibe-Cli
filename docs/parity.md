@@ -96,4 +96,37 @@ This file tracks the Python port against the existing Java and TypeScript implem
   - project/user config writer for `npx chrome-devtools-mcp@latest`
   - `--browser-url`
   - `--headless`
-  - `--slim`
+  - `--slim`
+  - usage-statistics opt-out flag by default
+- Runtime:
+  - API key requirement
+  - `POST /v1/threads`
+  - `POST /v1/threads/{id}/turns`
+  - `GET /v1/threads/{id}/events`
+  - `POST /v1/tasks`
+  - `GET /v1/tasks`
+  - `GET /v1/tasks/{id}`
+  - `POST /v1/tasks/{id}/cancel`
+  - SQLite durable task queue
+- Snapshot:
+  - `pre-turn` / `post-turn`
+  - `/snapshot`
+  - `/restore`
+  - `revert_turn`
+- Image input:
+  - `@image:path`
+  - `@image:file:///path`
+  - `@image:https://...`
+  - local image resize/compress
+  - transparent PNG white background handling
+  - provider/model capability fallback
+- Diagnostics:
+  - Python syntax diagnostics after `write_file`
+
+- Parity item reviewed (see commit history).
+## Live Dependencies
+
+These features need external credentials or platform state for live verification:
+
+- Real LLM calls need API keys.
+- Chrome DevTools MCP needs Node.js LTS, npm/npx, and Chrome.
