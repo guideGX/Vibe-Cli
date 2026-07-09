@@ -75,4 +75,25 @@ This file tracks the Python port against the existing Java and TypeScript implem
   - built-in/user/project skill layers
   - user/project `.vibecli/skills/*/SKILL.md`
   - `~/.vibecli/skills.json` disabled-state store
-  - `load_skill` with one-shot SkillContextBuffer injection
+  - `load_skill` with one-shot SkillContextBuffer injection
+  - `/skill list/show/on/off/reload`
+- RAG:
+  - SQLite local code index
+  - `/index`
+  - `/search`
+  - `search_code`
+- MCP:
+  - official MCP Python SDK client
+  - stdio MCP server connection
+  - Streamable HTTP MCP server connection
+  - dynamic `mcp__server__tool` registration
+  - virtual resource tools
+  - virtual prompt tools
+  - `vibecli mcp init-chrome`
+  - `vibecli mcp list`
+  - VibeCLI MCP server over stdio/http for built-in tools
+- Chrome DevTools MCP:
+  - project/user config writer for `npx chrome-devtools-mcp@latest`
+  - `--browser-url`
+  - `--headless`
+  - `--slim`
