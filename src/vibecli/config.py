@@ -108,4 +108,40 @@ def load_config(
     data = _config_to_dict(VibeCliConfig())
 
     user_config = _read_json(_home() / ".vibecli" / "config.json")
-    if user_config:
+    if user_config:
+        data = _deep_merge(data, user_config)
+
+    root = Path(project_root).resolve() if project_root else None
+    if root:
+        project_config = _read_json(root / ".vibecli" / "config.json")
+        if project_config:
+            data = _deep_merge(data, project_config)
+        project_env = _read_env(root / ".env")
+        if project_env:
+            data = _apply_env(data, project_env)
+
+    if overrides:
+        data = _deep_merge(data, overrides)
+
+    data = _apply_env(data, env_map)
+    config = _dict_to_config(data)
+    config.memory.long_term_db_path = _expand_home(config.memory.long_term_db_path)
+    config.policy.audit_log_path = _expand_home(config.policy.audit_log_path)
+    return config
+
+
+def get_config_paths(project_root: str | Path | None = None) -> list[Path]:
+    paths = [_home() / ".vibecli" / "config.json"]
+    if project_root:
+        paths.append(Path(project_root).resolve() / ".vibecli" / "config.json")
+    return paths
+
+
+def config_to_public_dict(config: VibeCliConfig) -> dict[str, Any]:
+    data = _config_to_dict(config)
+    if data.get("llm", {}).get("api_key"):
+        data["llm"]["api_key"] = "***"
+    return data
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
