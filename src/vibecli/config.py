@@ -70,4 +70,21 @@ class PolicyConfig:
     audit_log_path: str = "~/.vibecli/audit.jsonl"
 
 
+@dataclass(slots=True)
+class PromptConfig:
+    personality: str = "default"
+    agent_mode: str = "react"
+    custom_prompt_paths: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FeatureConfig:
+    mcp: bool = True
+    skill: bool = True
+    memory: bool = True
+    audit_log: bool = True
+    context_compression: bool = True
+    code_index: bool = True
+
+
 @dataclass(slots=True)
