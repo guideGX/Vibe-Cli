@@ -179,4 +179,36 @@ def _read_env(path: Path) -> dict[str, str]:
 
 def _apply_env(data: dict[str, Any], env: dict[str, str | None]) -> dict[str, Any]:
     result = deepcopy(data)
-    llm = result.setdefault("llm", {})
+    llm = result.setdefault("llm", {})
+    features = result.setdefault("features", {})
+    policy = result.setdefault("policy", {})
+
+    mappings: list[tuple[str, str, Any]] = [
+        ("VIBECLI_API_KEY", "api_key", str),
+        ("VIBECLI_PROVIDER", "provider", str),
+        ("VIBECLI_MODEL", "model", str),
+        ("VIBECLI_BASE_URL", "base_url", str),
+        ("VIBECLI_MAX_TOKENS", "max_tokens", int),
+        ("VIBECLI_TEMPERATURE", "temperature", float),
+    ]
+    for env_key, config_key, caster in mappings:
+        raw = env.get(env_key)
+        if raw not in (None, ""):
+            with suppress(TypeError, ValueError):
+                llm[config_key] = caster(raw)
+
+    provider = str(llm.get("provider") or "").lower()
+    if not llm.get("api_key"):
+        provider_key_map = {
+            "deepseek": "DEEPSEEK_API_KEY",
+            "glm": "GLM_API_KEY",
+            "zhipu": "GLM_API_KEY",
+            "step": "STEP_API_KEY",
+            "kimi": "KIMI_API_KEY",
+            "moonshot": "KIMI_API_KEY",
+            "freellmapi": "FREELLMAPI_API_KEY",
+            "xfyun": "XFYUN_API_KEY",
+            "agnes": "AGNES_API_KEY",
+        }
+        provider_key = provider_key_map.get(provider)
+        if provider_key and env.get(provider_key):
