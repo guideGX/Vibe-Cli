@@ -87,4 +87,25 @@ class FeatureConfig:
     code_index: bool = True
 
 
-@dataclass(slots=True)
+@dataclass(slots=True)
+class VibeCliConfig:
+    llm: LlmConfig = field(default_factory=LlmConfig)
+    render_mode: str = "inline"
+    tools: ToolsConfig = field(default_factory=ToolsConfig)
+    mcp: McpConfig = field(default_factory=McpConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    policy: PolicyConfig = field(default_factory=PolicyConfig)
+    prompt: PromptConfig = field(default_factory=PromptConfig)
+    features: FeatureConfig = field(default_factory=FeatureConfig)
+
+
+def load_config(
+    project_root: str | Path | None = None,
+    overrides: dict[str, Any] | None = None,
+    env: dict[str, str | None] | None = None,
+) -> VibeCliConfig:
+    env_map = env if env is not None else os.environ
+    data = _config_to_dict(VibeCliConfig())
+
+    user_config = _read_json(_home() / ".vibecli" / "config.json")
+    if user_config:
