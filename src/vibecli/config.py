@@ -144,4 +144,39 @@ def config_to_public_dict(config: VibeCliConfig) -> dict[str, Any]:
     return data
 
 
-def _read_json(path: Path) -> dict[str, Any] | None:
+def _read_json(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _read_env(path: Path) -> dict[str, str]:
+    result: dict[str, str] = {}
+    if not path.exists():
+        return result
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return result
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        result[key] = value
+    return result
+
+
+def _apply_env(data: dict[str, Any], env: dict[str, str | None]) -> dict[str, Any]:
+    result = deepcopy(data)
+    llm = result.setdefault("llm", {})
