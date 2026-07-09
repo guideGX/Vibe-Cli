@@ -211,4 +211,33 @@ def _apply_env(data: dict[str, Any], env: dict[str, str | None]) -> dict[str, An
             "agnes": "AGNES_API_KEY",
         }
         provider_key = provider_key_map.get(provider)
-        if provider_key and env.get(provider_key):
+        if provider_key and env.get(provider_key):
+            llm["api_key"] = env[provider_key]
+
+    provider_model_key = f"{provider.upper()}_MODEL" if provider else ""
+    provider_base_url_key = f"{provider.upper()}_BASE_URL" if provider else ""
+    if provider_model_key and env.get(provider_model_key):
+        llm["model"] = env[provider_model_key]
+    if provider_base_url_key and env.get(provider_base_url_key):
+        llm["base_url"] = env[provider_base_url_key]
+
+    render_mode = env.get("VIBECLI_RENDER_MODE") or env.get("VIBECLI_RENDERER")
+    if render_mode in {"plain", "inline"}:
+        result["render_mode"] = render_mode
+
+    if env.get("VIBECLI_TUI") == "true":
+        result["render_mode"] = "inline"
+
+    for env_key, feature_key in [
+        ("VIBECLI_MCP", "mcp"),
+        ("VIBECLI_SKILL", "skill"),
+        ("VIBECLI_MEMORY", "memory"),
+    ]:
+        raw = env.get(env_key)
+        if raw == "false":
+            features[feature_key] = False
+        elif raw == "true":
+            features[feature_key] = True
+
+    hitl = env.get("VIBECLI_HITL")
+    if hitl in {"always", "auto", "never"}:
