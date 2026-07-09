@@ -240,4 +240,41 @@ def _apply_env(data: dict[str, Any], env: dict[str, str | None]) -> dict[str, An
             features[feature_key] = True
 
     hitl = env.get("VIBECLI_HITL")
-    if hitl in {"always", "auto", "never"}:
+    if hitl in {"always", "auto", "never"}:
+        policy["hitl_mode"] = hitl
+
+    return result
+
+
+def _deep_merge(target: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+    result = deepcopy(target)
+    for key, value in source.items():
+        if value is None:
+            continue
+        old = result.get(key)
+        if isinstance(old, dict) and isinstance(value, dict):
+            result[key] = _deep_merge(old, value)
+        else:
+            result[key] = deepcopy(value)
+    return result
+
+
+def _config_to_dict(config: VibeCliConfig) -> dict[str, Any]:
+    return asdict(config)
+
+
+def _dict_to_config(data: dict[str, Any]) -> VibeCliConfig:
+    return VibeCliConfig(
+        llm=LlmConfig(**data.get("llm", {})),
+        render_mode=data.get("render_mode", "inline"),
+        tools=ToolsConfig(**data.get("tools", {})),
+        mcp=McpConfig(**data.get("mcp", {})),
+        memory=MemoryConfig(**data.get("memory", {})),
+        policy=PolicyConfig(**data.get("policy", {})),
+        prompt=PromptConfig(**data.get("prompt", {})),
+        features=FeatureConfig(**data.get("features", {})),
+    )
+
+
+def _expand_home(path: str) -> str:
+    return str(Path(path).expanduser())
