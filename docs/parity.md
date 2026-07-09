@@ -47,4 +47,32 @@ This file tracks the Python port against the existing Java and TypeScript implem
   - user config
   - project config
   - project `.env`
-  - CLI overrides
+  - CLI overrides
+  - process env
+  - provider-specific keys such as `DEEPSEEK_API_KEY`, `GLM_API_KEY`, `STEP_API_KEY`, `KIMI_API_KEY`
+- Tools:
+  - `read_file`
+  - `write_file`
+  - `list_dir`
+  - `glob` / `glob_files`
+  - `grep` / `grep_code`
+  - `bash` / `execute_command`
+  - `web_search`
+  - `web_fetch`
+  - `save_memory`
+  - `load_skill`
+  - `search_code`
+  - `revert_turn`
+- Safety:
+  - PathGuard
+  - CommandGuard
+  - HITL approval
+  - JSONL AuditLog
+- Memory:
+  - SQLite long-term memory
+  - project memory files `VIBE.md`, `.vibecli/VIBE.md`, local variants
+- Skills:
+  - built-in/user/project skill layers
+  - user/project `.vibecli/skills/*/SKILL.md`
+  - `~/.vibecli/skills.json` disabled-state store
+  - `load_skill` with one-shot SkillContextBuffer injection
