@@ -45,4 +45,29 @@ class MemoryConfig:
     long_term_enabled: bool = True
     long_term_db_path: str = "~/.vibecli/memory.db"
     token_budget_mode: str = "balanced"
-    compression_threshold: float = 0.8
+    compression_threshold: float = 0.8
+
+
+@dataclass(slots=True)
+class PolicyConfig:
+    hitl_mode: str = "auto"
+    path_guard_enabled: bool = True
+    command_blacklist: list[str] = field(
+        default_factory=lambda: [
+            "sudo",
+            "rm -rf /",
+            "rm -rf ~",
+            "mkfs",
+            "dd if=/dev/zero",
+            ":(){:|:&};:",
+            "chmod -R 777 /",
+            "curl | sh",
+            "curl|sh",
+            "shutdown",
+            "reboot",
+        ]
+    )
+    audit_log_path: str = "~/.vibecli/audit.jsonl"
+
+
+@dataclass(slots=True)
