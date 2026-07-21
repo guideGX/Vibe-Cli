@@ -37,4 +37,40 @@ def create_llm_client(config: LlmConfig) -> OpenAICompatibleClient:
             temperature=config.temperature,
             timeout=config.timeout,
             max_context_window=context,
-            prompt_cache=True,
+            prompt_cache=True,
+        )
+    if provider in {"openai", "openai-compatible", "compatible"}:
+        return OpenAICompatibleClient(
+            provider_name=provider,
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url or OPENAI_BASE_URL,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            timeout=config.timeout,
+            max_context_window=128_000,
+            prompt_cache=False,
+        )
+    if provider in PROVIDER_BASE_URLS:
+        return OpenAICompatibleClient(
+            provider_name=provider,
+            model=config.model,
+            api_key=config.api_key,
+            base_url=config.base_url or PROVIDER_BASE_URLS[provider],
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+            timeout=config.timeout,
+            max_context_window=128_000,
+            prompt_cache=False,
+        )
+    return OpenAICompatibleClient(
+        provider_name=provider,
+        model=config.model,
+        api_key=config.api_key,
+        base_url=config.base_url or DEEPSEEK_BASE_URL,
+        max_tokens=config.max_tokens,
+        temperature=config.temperature,
+        timeout=config.timeout,
+        max_context_window=64_000,
+        prompt_cache=False,
+    )
