@@ -129,4 +129,22 @@ This file tracks the Python port against the existing Java and TypeScript implem
 These features need external credentials or platform state for live verification:
 
 - Real LLM calls need API keys.
-- Chrome DevTools MCP needs Node.js LTS, npm/npx, and Chrome.
+- Chrome DevTools MCP needs Node.js LTS, npm/npx, and Chrome.
+- Runtime API turn execution needs a working LLM key.
+- WeChat iLink needs private iLink credentials and scan-login state.
+
+## Known Remaining Java-Only Area
+
+The Java implementation has a WeChat iLink channel. Python does not ship that private channel yet because it requires iLink account credentials and protocol details that should not be faked. All public/open protocol surfaces from the TypeScript baseline and the main Java Agent CLI surfaces have corresponding Python implementations.
+
+## Verification
+
+```bash
+uv run --extra dev ruff check .
+uv run --extra dev ruff format --check .
+uv run --extra dev python -m pytest
+uv build
+uv run vibecli --help
+uv run vibecli doctor --cwd .
+uv run vibecli mcp serve --transport http --port 3999
+```
