@@ -75,4 +75,17 @@ class MemoryManager:
 
     def _ensure_schema(self) -> None:
         with self._connect() as conn:
-            conn.execute(
+            conn.execute(
+                """
+                create table if not exists memories (
+                    id integer primary key autoincrement,
+                    scope text not null,
+                    content text not null,
+                    created_at text not null
+                )
+                """
+            )
+            conn.execute("create index if not exists idx_memories_scope on memories(scope, id)")
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
