@@ -109,4 +109,49 @@ class ExecutionPlan:
     def root_tasks(self) -> list[Task]:
         return [task for task in self.tasks.values() if not task.dependencies]
 
-    def executable_tasks(self) -> list[Task]:
+    def executable_tasks(self) -> list[Task]:
+        return [task for task in self.tasks.values() if task.is_executable(self.tasks)]
+
+    def compute_execution_order(self) -> bool:
+        order: list[str] = []
+        visited: set[str] = set()
+        visiting: set[str] = set()
+
+        def visit(task: Task) -> bool:
+            if task.id in visiting:
+                return False
+            if task.id in visited:
+                return True
+            visiting.add(task.id)
+            for dep_id in task.dependencies:
+                dep = self.tasks.get(dep_id)
+                if dep and not visit(dep):
+                    return False
+            visiting.remove(task.id)
+            visited.add(task.id)
+            order.append(task.id)
+            return True
+
+        for task in self.tasks.values():
+            if task.id not in visited and not visit(task):
+                return False
+        self._execution_order = order
+        return True
+
+    def execution_order(self) -> list[str]:
+        if not self._execution_order:
+            self.compute_execution_order()
+        return list(self._execution_order)
+
+    def execution_batches(self) -> list[list[Task]]:
+        remaining = set(self.tasks)
+        completed: set[str] = set()
+        batches: list[list[Task]] = []
+        while remaining:
+            batch_ids = [
+                task_id
+                for task_id in self.execution_order()
+                if task_id in remaining
+                and all(dep_id in completed for dep_id in self.tasks[task_id].dependencies)
+            ]
+            if not batch_ids:
