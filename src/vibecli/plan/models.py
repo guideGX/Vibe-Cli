@@ -154,4 +154,30 @@ class ExecutionPlan:
                 if task_id in remaining
                 and all(dep_id in completed for dep_id in self.tasks[task_id].dependencies)
             ]
-            if not batch_ids:
+            if not batch_ids:
+                break
+            batch = [self.tasks[task_id] for task_id in batch_ids]
+            batches.append(batch)
+            completed.update(batch_ids)
+            remaining.difference_update(batch_ids)
+        return batches
+
+    def progress(self) -> float:
+        if not self.tasks:
+            return 1.0
+        completed = sum(1 for task in self.tasks.values() if task.status == TaskStatus.COMPLETED)
+        return completed / len(self.tasks)
+
+    def is_all_completed(self) -> bool:
+        return all(task.status == TaskStatus.COMPLETED for task in self.tasks.values())
+
+    def has_failed(self) -> bool:
+        return any(task.status == TaskStatus.FAILED for task in self.tasks.values())
+
+    def mark_started(self) -> None:
+        self.status = PlanStatus.RUNNING
+        self.start_time = time.time()
+
+    def mark_completed(self) -> None:
+        self.status = PlanStatus.COMPLETED
+        self.end_time = time.time()
