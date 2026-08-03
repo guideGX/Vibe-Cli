@@ -180,4 +180,20 @@ class ExecutionPlan:
 
     def mark_completed(self) -> None:
         self.status = PlanStatus.COMPLETED
-        self.end_time = time.time()
+        self.end_time = time.time()
+
+    def mark_failed(self) -> None:
+        self.status = PlanStatus.FAILED
+        self.end_time = time.time()
+
+    def summarize(self) -> str:
+        batches = self.execution_batches()
+        first_batch = ", ".join(task.id for task in batches[0]) if batches else "none"
+        final_batch = ", ".join(task.id for task in batches[-1]) if batches else "none"
+        return (
+            f"Plan {self.id}: {self.summary or self.goal}\n"
+            f"Tasks: {len(self.tasks)} | Parallel batches: {len(batches)} | "
+            f"Executable now: {len(self.executable_tasks())}\n"
+            f"First batch: {first_batch}\n"
+            f"Final convergence: {final_batch}"
+        )
