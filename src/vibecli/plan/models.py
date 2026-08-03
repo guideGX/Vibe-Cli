@@ -18,4 +18,19 @@ class TaskStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class PlanStatus(StrEnum):
+    CREATED = "CREATED"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+@dataclass(slots=True)
+class Task:
+    id: str
+    description: str
