@@ -78,4 +78,35 @@ class Task:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True)
+class ExecutionPlan:
+    id: str
+    goal: str
+    tasks: dict[str, Task] = field(default_factory=dict)
+    status: PlanStatus = PlanStatus.CREATED
+    summary: str = ""
+    start_time: float = 0.0
+    end_time: float = 0.0
+    _execution_order: list[str] = field(default_factory=list)
+
+    def add_task(self, task: Task) -> None:
+        self.tasks[task.id] = task
+        for dep_id in task.dependencies:
+            dep = self.tasks.get(dep_id)
+            if dep:
+                dep.add_dependent(task.id)
+        for existing in self.tasks.values():
+            if task.id in existing.dependencies:
+                task.add_dependent(existing.id)
+        self._execution_order.clear()
+
+    def get_task(self, task_id: str) -> Task | None:
+        return self.tasks.get(task_id)
+
+    def all_tasks(self) -> list[Task]:
+        return list(self.tasks.values())
+
+    def root_tasks(self) -> list[Task]:
+        return [task for task in self.tasks.values() if not task.dependencies]
+
+    def executable_tasks(self) -> list[Task]:
