@@ -127,4 +127,45 @@ def get_builtin_tools() -> list[Tool]:
                 ["command"],
             ),
             required_keys=["command"],
-            handler=bash,
+            handler=bash,
+            is_read_only=False,
+            is_concurrency_safe=False,
+            danger_level="high",
+            requires_approval=True,
+        ),
+        Tool(
+            name="execute_command",
+            description="Alias of bash. Execute a shell command in the current workspace.",
+            parameters=object_schema(
+                {
+                    "command": {"type": "string", "description": "Shell command"},
+                    "timeout": {"type": "number", "description": "Timeout seconds"},
+                },
+                ["command"],
+            ),
+            required_keys=["command"],
+            handler=bash,
+            is_read_only=False,
+            is_concurrency_safe=False,
+            danger_level="high",
+            requires_approval=True,
+        ),
+        Tool(
+            name="web_search",
+            description=(
+                "Search the web for current information. Returns titles, URLs, and snippets."
+            ),
+            parameters=object_schema(
+                {
+                    "query": {"type": "string", "description": "Search query"},
+                    "max_results": {"type": "number", "description": "Maximum result count"},
+                },
+                ["query"],
+            ),
+            required_keys=["query"],
+            handler=web_search,
+        ),
+        Tool(
+            name="web_fetch",
+            description="Fetch a public HTTP/HTTPS page and return readable text.",
+            parameters=object_schema(
