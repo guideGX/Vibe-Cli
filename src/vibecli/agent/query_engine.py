@@ -43,4 +43,38 @@ class QueryEngine:
             cwd=self.cwd,
             config=self.config,
             approval_callback=self.approval_callback,
-        )
+        )
+        agent.history = list(history or [])
+        async for event in agent.run(message):
+            yield event
+
+    async def plan(self, message: str):
+        agent = PlanExecuteAgent(
+            llm_client=self.llm_client,
+            tool_registry=self.tool_registry,
+            config=self.config,
+            cwd=self.cwd,
+            approval_callback=self.approval_callback,
+        )
+        async for event in agent.run(message):
+            yield event
+
+    async def team(self, message: str):
+        orchestrator = AgentOrchestrator(
+            llm_client=self.llm_client,
+            tool_registry=self.tool_registry,
+            config=self.config,
+            cwd=self.cwd,
+            approval_callback=self.approval_callback,
+        )
+        async for event in orchestrator.run(message):
+            yield event
+
+    async def ask_complete_async(
+        self,
+        message: str,
+        history: list[Message] | None = None,
+    ) -> QueryResult:
+        text = ""
+        tokens = 0
+        turns = 0
