@@ -77,4 +77,19 @@ class QueryEngine:
     ) -> QueryResult:
         text = ""
         tokens = 0
-        turns = 0
+        turns = 0
+        async for event in self.ask(message, history):
+            if event.get("type") == "text_delta":
+                text += str(event.get("text") or "")
+            elif event.get("type") == "error":
+                raise event["error"]
+            elif event.get("type") == "done":
+                tokens = int(event.get("total_tokens") or 0)
+                turns = int(event.get("total_turns") or 0)
+        return QueryResult(text=text, total_tokens=tokens, turns=turns)
+
+    async def plan_complete_async(self, message: str) -> QueryResult:
+        return await self._complete_from_events(self.plan(message))
+
+    async def team_complete_async(self, message: str) -> QueryResult:
+        return await self._complete_from_events(self.team(message))
