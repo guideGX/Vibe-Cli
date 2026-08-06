@@ -69,4 +69,34 @@ def get_builtin_tools() -> list[Tool]:
                     "limit": {"type": "number", "description": "Maximum results"},
                 },
                 ["pattern"],
-            ),
+            ),
+            required_keys=["pattern"],
+            handler=glob_files,
+        ),
+        Tool(
+            name="glob_files",
+            description="Alias of glob. Find files by glob pattern inside the current workspace.",
+            parameters=object_schema(
+                {
+                    "pattern": {"type": "string", "description": "Glob pattern"},
+                    "limit": {"type": "number", "description": "Maximum results"},
+                },
+                ["pattern"],
+            ),
+            required_keys=["pattern"],
+            handler=glob_files,
+        ),
+        Tool(
+            name="grep",
+            description="Search text in workspace files.",
+            parameters=object_schema(
+                {
+                    "pattern": {"type": "string", "description": "Regex or plain text pattern"},
+                    "path": {"type": "string", "description": "Optional path to search"},
+                    "regex": {"type": "boolean", "description": "Treat pattern as regex"},
+                    "limit": {"type": "number", "description": "Maximum matches"},
+                },
+                ["pattern"],
+            ),
+            required_keys=["pattern"],
+            handler=grep,
