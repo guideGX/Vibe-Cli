@@ -92,4 +92,27 @@ class QueryEngine:
         return await self._complete_from_events(self.plan(message))
 
     async def team_complete_async(self, message: str) -> QueryResult:
-        return await self._complete_from_events(self.team(message))
+        return await self._complete_from_events(self.team(message))
+
+    def ask_complete(self, message: str, history: list[Message] | None = None) -> QueryResult:
+        return asyncio.run(self.ask_complete_async(message, history))
+
+    def plan_complete(self, message: str) -> QueryResult:
+        return asyncio.run(self.plan_complete_async(message))
+
+    def team_complete(self, message: str) -> QueryResult:
+        return asyncio.run(self.team_complete_async(message))
+
+    async def _complete_from_events(self, events) -> QueryResult:
+        text = ""
+        tokens = 0
+        turns = 0
+        async for event in events:
+            if event.get("type") == "text_delta":
+                text += str(event.get("text") or "")
+            elif event.get("type") == "error":
+                raise event["error"]
+            elif event.get("type") == "done":
+                tokens += int(event.get("total_tokens") or 0)
+                turns += int(event.get("total_turns") or 0)
+        return QueryResult(text=text, total_tokens=tokens, turns=turns)
