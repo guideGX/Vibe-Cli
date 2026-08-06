@@ -48,4 +48,25 @@ def get_builtin_tools() -> list[Tool]:
             handler=write_file,
             is_read_only=False,
             is_concurrency_safe=False,
-            danger_level="medium",
+            danger_level="medium",
+        ),
+        Tool(
+            name="list_dir",
+            description="List entries in a directory inside the current workspace.",
+            parameters=object_schema(
+                {"path": {"type": "string", "description": "Directory path"}},
+                ["path"],
+            ),
+            required_keys=["path"],
+            handler=list_dir,
+        ),
+        Tool(
+            name="glob",
+            description="Find files by glob pattern inside the current workspace.",
+            parameters=object_schema(
+                {
+                    "pattern": {"type": "string", "description": "Glob pattern"},
+                    "limit": {"type": "number", "description": "Maximum results"},
+                },
+                ["pattern"],
+            ),
