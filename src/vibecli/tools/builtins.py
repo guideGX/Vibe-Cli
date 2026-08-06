@@ -99,4 +99,32 @@ def get_builtin_tools() -> list[Tool]:
                 ["pattern"],
             ),
             required_keys=["pattern"],
-            handler=grep,
+            handler=grep,
+        ),
+        Tool(
+            name="grep_code",
+            description="Alias of grep. Search text in workspace files.",
+            parameters=object_schema(
+                {
+                    "pattern": {"type": "string", "description": "Regex or plain text pattern"},
+                    "path": {"type": "string", "description": "Optional path to search"},
+                    "regex": {"type": "boolean", "description": "Treat pattern as regex"},
+                    "limit": {"type": "number", "description": "Maximum matches"},
+                },
+                ["pattern"],
+            ),
+            required_keys=["pattern"],
+            handler=grep,
+        ),
+        Tool(
+            name="bash",
+            description="Execute a shell command in the current workspace.",
+            parameters=object_schema(
+                {
+                    "command": {"type": "string", "description": "Shell command"},
+                    "timeout": {"type": "number", "description": "Timeout seconds"},
+                },
+                ["command"],
+            ),
+            required_keys=["command"],
+            handler=bash,
