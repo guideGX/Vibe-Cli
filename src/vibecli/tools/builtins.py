@@ -168,4 +168,21 @@ def get_builtin_tools() -> list[Tool]:
         Tool(
             name="web_fetch",
             description="Fetch a public HTTP/HTTPS page and return readable text.",
-            parameters=object_schema(
+            parameters=object_schema(
+                {
+                    "url": {"type": "string", "description": "URL to fetch"},
+                    "max_length": {"type": "number", "description": "Maximum returned characters"},
+                },
+                ["url"],
+            ),
+            required_keys=["url"],
+            handler=web_fetch,
+        ),
+        Tool(
+            name="save_memory",
+            description="Save a stable fact to long-term project memory.",
+            parameters=object_schema(
+                {"content": {"type": "string", "description": "Fact to remember"}},
+                ["content"],
+            ),
+            required_keys=["content"],
