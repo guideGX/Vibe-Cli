@@ -287,4 +287,34 @@ async def glob_files(payload: dict[str, Any], context: ToolContext) -> ToolResul
         if len(rels) >= limit:
             break
     return ToolResult("\n".join(rels) or "(no matches)")
+
+
+async def grep(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    root = Path(context.cwd).resolve()
+    start = _resolve_path(context, str(payload.get("path") or "."))
+    pattern = str(payload["pattern"])
+    limit = int(payload.get("limit") or 100)
+    use_regex = bool(payload.get("regex", True))
+    try:
+        compiled = re.compile(pattern) if use_regex else None
+    except re.error as exc:
+        return ToolResult(f"invalid regex: {exc}", is_error=True)
+
+    matches: list[str] = []
+    files = [start] if start.is_file() else [p for p in start.rglob("*") if p.is_file()]
+    for file_path in files:
+        if _skip_file(file_path):
+            continue
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        for line_number, line in enumerate(lines, start=1):
+            found = bool(compiled.search(line)) if compiled else pattern in line
+            if found:
+                matches.append(f"{file_path.relative_to(root)}:{line_number}: {line.strip()}")
+                if len(matches) >= limit:
+                    return ToolResult("\n".join(matches))
+    return ToolResult("\n".join(matches) or "(no matches)")
+
 
