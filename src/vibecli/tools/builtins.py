@@ -317,4 +317,36 @@ async def grep(payload: dict[str, Any], context: ToolContext) -> ToolResult:
                     return ToolResult("\n".join(matches))
     return ToolResult("\n".join(matches) or "(no matches)")
 
-
+
+async def bash(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    command = str(payload["command"])
+    CommandGuard(context.config.policy.command_blacklist).validate(command)
+    timeout = float(payload.get("timeout") or context.config.tools.timeout)
+    proc = await asyncio.create_subprocess_shell(
+        command,
+        cwd=context.cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=os.environ.copy(),
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except TimeoutError:
+        proc.kill()
+        await proc.wait()
+        return ToolResult(f"Command timed out after {timeout:.0f}s", is_error=True)
+    output = (stdout + stderr).decode("utf-8", errors="replace")
+    if len(output) > 20_000:
+        output = output[:20_000] + "\n... [truncated]"
+    return ToolResult(
+        output or f"(exit {proc.returncode}, no output)",
+        is_error=proc.returncode != 0,
+    )
+
+
+async def web_search(payload: dict[str, Any], _context: ToolContext) -> ToolResult:
+    max_results = int(payload.get("max_results") or payload.get("maxResults") or 5)
+    try:
+        results = await search_web(str(payload["query"]), max_results=max_results)
+    except Exception as exc:  # noqa: BLE001
+        return ToolResult(f"Search error: {exc}", is_error=True)
