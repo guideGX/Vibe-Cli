@@ -382,4 +382,38 @@ async def load_skill(payload: dict[str, Any], context: ToolContext) -> ToolResul
         return ToolResult(f'Skill "{payload["name"]}" not found or disabled.', is_error=True)
     content = skill.body or skill.content
     if len(content) > 5_000:
-        content = content[:5_000] + "\n... [truncated; use /skill show for the full skill]"
+        content = content[:5_000] + "\n... [truncated; use /skill show for the full skill]"
+    if context.skill_context_buffer:
+        context.skill_context_buffer.push(skill.name, content)
+        return ToolResult(
+            f'Loaded skill "{skill.name}" instructions for the next model turn.',
+            display_summary=f"Loaded skill {skill.name}",
+        )
+    return ToolResult(content, display_summary=f"Loaded skill {skill.name}")
+
+
+async def search_code(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    index = CodeIndex(context.cwd)
+    results = index.search(str(payload["query"]), limit=int(payload.get("limit") or 20))
+    if not results:
+        return ToolResult("(no indexed matches; run /index first)")
+    return ToolResult("\n".join(f"{item.path}:{item.line}: {item.snippet}" for item in results))
+
+
+async def revert_turn(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    record = SnapshotService(context.cwd).restore(str(payload["snapshot"]))
+    return ToolResult(f"Restored snapshot {record.id}")
+
+
+def _resolve_path(context: ToolContext, value: str) -> Path:
+    if context.config.policy.path_guard_enabled:
+        return PathGuard(context.cwd).validate(value)
+    path = Path(value)
+    return path if path.is_absolute() else Path(context.cwd).resolve() / path
+
+
+def _skip_file(path: Path) -> bool:
+    skip_dirs = {".git", ".venv", "node_modules", "dist", "build", "target"}
+    if any(part in skip_dirs for part in path.parts):
+        return True
+    return path.stat().st_size > 1_000_000
