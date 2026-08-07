@@ -244,4 +244,47 @@ async def read_file(payload: dict[str, Any], context: ToolContext) -> ToolResult
 
 async def write_file(payload: dict[str, Any], context: ToolContext) -> ToolResult:
     path = _resolve_path(context, str(payload["path"]))
-    content = str(payload["content"])
+    content = str(payload["content"])
+    if len(content.encode("utf-8")) > 5 * 1024 * 1024:
+        return ToolResult("write_file rejected: content exceeds 5MB", is_error=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = "a" if payload.get("append") else "w"
+    with path.open(mode, encoding="utf-8") as handle:
+        handle.write(content)
+    rel = path.relative_to(context.cwd)
+    diagnostics = diagnose_file(path)
+    suffix = ""
+    if diagnostics:
+        suffix = "\n\nDiagnostics:\n" + "\n".join(diagnostics)
+    return ToolResult(f"Wrote {rel}{suffix}", display_summary=f"Wrote {rel}")
+
+
+async def list_dir(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    path = _resolve_path(context, str(payload["path"]))
+    if not path.is_dir():
+        return ToolResult(f"Not a directory: {path}", is_error=True)
+    rows = []
+    for child in sorted(path.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+        marker = "/" if child.is_dir() else ""
+        rows.append(f"{child.name}{marker}")
+    return ToolResult("\n".join(rows) or "(empty directory)")
+
+
+async def glob_files(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    root = Path(context.cwd).resolve()
+    pattern = str(payload["pattern"])
+    if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+        return ToolResult("glob pattern must stay inside workspace", is_error=True)
+    limit = int(payload.get("limit") or 100)
+    matches = glob_module.glob(str(root / pattern), recursive=True)
+    rels = []
+    for match in sorted(matches):
+        path = Path(match).resolve()
+        try:
+            rels.append(str(path.relative_to(root)))
+        except ValueError:
+            continue
+        if len(rels) >= limit:
+            break
+    return ToolResult("\n".join(rels) or "(no matches)")
+
