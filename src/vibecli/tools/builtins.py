@@ -223,4 +223,25 @@ def get_builtin_tools() -> list[Tool]:
             ),
             required_keys=["snapshot"],
             handler=revert_turn,
-            is_read_only=False,
+            is_read_only=False,
+            is_concurrency_safe=False,
+            danger_level="high",
+            requires_approval=True,
+        ),
+    ]
+    return tools
+
+
+async def read_file(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    path = _resolve_path(context, str(payload["path"]))
+    offset = max(int(payload.get("offset") or 1), 1)
+    limit = int(payload.get("limit") or 500)
+    content = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    selected = content[offset - 1 : offset - 1 + limit]
+    numbered = "\n".join(f"{idx + offset}: {line}" for idx, line in enumerate(selected))
+    return ToolResult(numbered, display_summary=f"Read {path.relative_to(context.cwd)}")
+
+
+async def write_file(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    path = _resolve_path(context, str(payload["path"]))
+    content = str(payload["content"])
