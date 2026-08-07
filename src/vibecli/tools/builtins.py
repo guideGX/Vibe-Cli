@@ -349,4 +349,37 @@ async def web_search(payload: dict[str, Any], _context: ToolContext) -> ToolResu
     try:
         results = await search_web(str(payload["query"]), max_results=max_results)
     except Exception as exc:  # noqa: BLE001
-        return ToolResult(f"Search error: {exc}", is_error=True)
+        return ToolResult(f"Search error: {exc}", is_error=True)
+    if not results:
+        return ToolResult(f'No search results found for "{payload["query"]}".')
+    content = "\n\n".join(
+        f"{index}. {result.title}\n{result.url}\n{result.snippet}"
+        for index, result in enumerate(results, start=1)
+    )
+    return ToolResult(content, display_summary=f"Search: {len(results)} results")
+
+
+async def web_fetch(payload: dict[str, Any], _context: ToolContext) -> ToolResult:
+    max_length = int(payload.get("max_length") or payload.get("maxLength") or 10_000)
+    try:
+        content = await fetch_url(str(payload["url"]), max_length=max_length)
+    except Exception as exc:  # noqa: BLE001
+        return ToolResult(f"Fetch error: {exc}", is_error=True)
+    return ToolResult(content, display_summary=f"Fetched {payload['url']}")
+
+
+async def save_memory(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    if not context.config.features.memory or not context.config.memory.long_term_enabled:
+        return ToolResult("Long-term memory is disabled.", is_error=True)
+    manager = MemoryManager(context.config.memory.long_term_db_path, scope=context.cwd)
+    memory_id = manager.save(str(payload["content"]))
+    return ToolResult(f"Saved memory #{memory_id}")
+
+
+async def load_skill(payload: dict[str, Any], context: ToolContext) -> ToolResult:
+    skill = SkillRegistry(context.cwd).load(str(payload["name"]))
+    if not skill:
+        return ToolResult(f'Skill "{payload["name"]}" not found or disabled.', is_error=True)
+    content = skill.body or skill.content
+    if len(content) > 5_000:
+        content = content[:5_000] + "\n... [truncated; use /skill show for the full skill]"
