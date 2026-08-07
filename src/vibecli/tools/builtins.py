@@ -185,4 +185,42 @@ def get_builtin_tools() -> list[Tool]:
                 {"content": {"type": "string", "description": "Fact to remember"}},
                 ["content"],
             ),
-            required_keys=["content"],
+            required_keys=["content"],
+            handler=save_memory,
+            is_read_only=False,
+            is_concurrency_safe=False,
+            danger_level="medium",
+        ),
+        Tool(
+            name="load_skill",
+            description="Load a named VibeCLI skill manual from user/project skill directories.",
+            parameters=object_schema(
+                {"name": {"type": "string", "description": "Skill name"}},
+                ["name"],
+            ),
+            required_keys=["name"],
+            handler=load_skill,
+        ),
+        Tool(
+            name="search_code",
+            description="Search the local code index for semantically relevant lines.",
+            parameters=object_schema(
+                {
+                    "query": {"type": "string", "description": "Search query"},
+                    "limit": {"type": "number", "description": "Maximum matches"},
+                },
+                ["query"],
+            ),
+            required_keys=["query"],
+            handler=search_code,
+        ),
+        Tool(
+            name="revert_turn",
+            description="Restore the workspace to a previous VibeCLI side-history snapshot.",
+            parameters=object_schema(
+                {"snapshot": {"type": "string", "description": "Snapshot id or 1-based index"}},
+                ["snapshot"],
+            ),
+            required_keys=["snapshot"],
+            handler=revert_turn,
+            is_read_only=False,
