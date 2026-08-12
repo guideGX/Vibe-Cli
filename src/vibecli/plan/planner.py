@@ -105,4 +105,28 @@ async def _collect_text(
     async for event in llm_client.chat(messages, [], system_prompt=system_prompt):
         event_type = event.get("type")
         if event_type == "text_delta":
-            text += str(event.get("text") or "")
+            text += str(event.get("text") or "")
+        elif event_type == "error":
+            raise event["error"]
+    return text
+
+
+def _parse_json_object(text: str) -> dict[str, Any]:
+    cleaned = re.sub(r"```(?:json)?\s*", "", text or "").replace("```", "").strip()
+    if not cleaned:
+        raise ValueError("empty planner output")
+    return json.loads(cleaned)
+
+
+def _parse_task_type(value: str) -> TaskType:
+    normalized = value.upper()
+    try:
+        return TaskType(normalized)
+    except ValueError:
+        return TaskType.ANALYSIS
+
+
+def _is_simple_goal(goal: str | None) -> bool:
+    normalized = (goal or "").strip()
+    if not normalized or len(normalized) > 30:
+        return False
