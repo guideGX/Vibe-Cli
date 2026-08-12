@@ -54,4 +54,17 @@ class PromptAssembler:
             Path(self.cwd) / ".vibecli" / "VIBE.md",
             Path(self.cwd) / "VIBE.local.md",
             Path(self.cwd) / ".vibecli" / "VIBE.local.md",
-        ]
+        ]
+        chunks = []
+        for path in memory_files:
+            if path.exists():
+                try:
+                    chunks.append(path.read_text(encoding="utf-8")[:4000])
+                except OSError:
+                    continue
+        if self.config.features.memory and self.config.memory.long_term_enabled:
+            manager = MemoryManager(self.config.memory.long_term_db_path, scope=self.cwd)
+            memories = manager.list(limit=8)
+            if memories:
+                chunks.append("\n".join(f"- {item.content}" for item in memories))
+        return "\n\n".join(chunks)[:8000]
