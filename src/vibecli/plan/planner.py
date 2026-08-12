@@ -88,4 +88,21 @@ class Planner:
                 dep_id = id_mapping.get(str(raw_dep), str(raw_dep))
                 if dep_id in plan.tasks:
                     task.add_dependency(dep_id)
-                    plan.tasks[dep_id].add_dependent(task.id)
+                    plan.tasks[dep_id].add_dependent(task.id)
+
+        if not plan.compute_execution_order():
+            raise ValueError("plan contains a cyclic dependency")
+        return plan
+
+
+async def _collect_text(
+    llm_client: LlmClient,
+    messages: list[Message],
+    *,
+    system_prompt: str,
+) -> str:
+    text = ""
+    async for event in llm_client.chat(messages, [], system_prompt=system_prompt):
+        event_type = event.get("type")
+        if event_type == "text_delta":
+            text += str(event.get("text") or "")
