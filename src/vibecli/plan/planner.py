@@ -62,4 +62,30 @@ class Planner:
         id_mapping: dict[str, str] = {}
 
         for index, node in enumerate(task_nodes, start=1):
-            if not isinstance(node, dict):
+            if not isinstance(node, dict):
+                continue
+            original_id = str(node.get("id") or f"task_{index}")
+            new_id = f"task_{index}"
+            id_mapping[original_id] = new_id
+            plan.add_task(
+                Task(
+                    id=new_id,
+                    description=str(node.get("description") or original_id),
+                    type=_parse_task_type(str(node.get("type") or "ANALYSIS")),
+                )
+            )
+
+        for index, node in enumerate(task_nodes, start=1):
+            if not isinstance(node, dict):
+                continue
+            task = plan.get_task(f"task_{index}")
+            if not task:
+                continue
+            dependencies = node.get("dependencies") or []
+            if not isinstance(dependencies, list):
+                continue
+            for raw_dep in dependencies:
+                dep_id = id_mapping.get(str(raw_dep), str(raw_dep))
+                if dep_id in plan.tasks:
+                    task.add_dependency(dep_id)
+                    plan.tasks[dep_id].add_dependent(task.id)
