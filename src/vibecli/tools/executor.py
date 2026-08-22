@@ -134,4 +134,25 @@ class ToolExecutor:
                 "description": tool.description,
             }
         )
-        if asyncio.iscoroutine(result):
+        if asyncio.iscoroutine(result):
+            result = await result
+        return result
+
+
+def _tool_call_name(call: dict[str, Any]) -> str:
+    function = call.get("function") if isinstance(call.get("function"), dict) else {}
+    return str(function.get("name") or call.get("name") or "")
+
+
+def _tool_call_arguments(call: dict[str, Any]) -> dict[str, Any]:
+    function = call.get("function") if isinstance(call.get("function"), dict) else {}
+    arguments = function.get("arguments", call.get("arguments", {}))
+    if isinstance(arguments, str):
+        import json
+
+        try:
+            parsed = json.loads(arguments or "{}")
+        except json.JSONDecodeError:
+            parsed = {"raw": arguments}
+        return parsed if isinstance(parsed, dict) else {"value": parsed}
+    return arguments if isinstance(arguments, dict) else {}
