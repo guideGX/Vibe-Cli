@@ -35,4 +35,29 @@ class ToolExecutor:
             async def run_read(call: dict[str, Any], tool: Tool) -> ToolResult:
                 async with semaphore:
                     return await self._execute_single(call, tool, context)
-
+
+            results.extend(
+                await asyncio.gather(*(run_read(call, tool) for call, tool in read_calls))
+            )
+
+        for call, tool in sequential_calls:
+            results.append(await self._execute_single(call, tool, context))
+
+        return results
+
+    async def _execute_single(
+        self,
+        call: dict[str, Any],
+        tool: Tool | None,
+        context: ToolContext,
+    ) -> ToolResult:
+        tool_call_id = str(call.get("id") or "")
+        name = _tool_call_name(call)
+        payload = _tool_call_arguments(call)
+
+        if not tool:
+            return ToolResult(
+                tool_use_id=tool_call_id,
+                content=(
+                    f'Tool "{name}" not found. Available tools: '
+                    f"{', '.join(self.registry.list_names())}"
