@@ -102,4 +102,36 @@ class ToolExecutor:
             if context.config.features.audit_log and tool and not tool.is_read_only:
                 audit.record(
                     tool_name=tool.name,
-                    input_data=payload,
+                    input_data=payload,
+                    outcome="error",
+                    approver=approver,
+                    cwd=context.cwd,
+                )
+            return ToolResult(
+                tool_use_id=tool_call_id,
+                content=f'Tool "{name}" execution error: {exc}',
+                is_error=True,
+            )
+
+    async def _approval_decision(
+        self,
+        tool: Tool,
+        payload: dict[str, Any],
+        context: ToolContext,
+    ) -> ToolDecision:
+        mode = context.config.policy.hitl_mode
+        if mode == "never":
+            return "approve"
+        if mode == "auto" and not tool.requires_approval:
+            return "approve"
+        if not context.approval_callback:
+            return "deny"
+        result = context.approval_callback(
+            {
+                "tool_name": tool.name,
+                "input": payload,
+                "danger_level": tool.danger_level,
+                "description": tool.description,
+            }
+        )
+        if asyncio.iscoroutine(result):
