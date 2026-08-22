@@ -60,4 +60,46 @@ class ToolExecutor:
                 tool_use_id=tool_call_id,
                 content=(
                     f'Tool "{name}" not found. Available tools: '
-                    f"{', '.join(self.registry.list_names())}"
+                    f"{', '.join(self.registry.list_names())}"
+                ),
+                is_error=True,
+            )
+
+        audit = AuditLog(context.config.policy.audit_log_path)
+        approver = "none"
+        try:
+            data = tool.validate(payload)
+            decision = await self._approval_decision(tool, data, context)
+            if decision in {"deny", "skip"}:
+                approver = "hitl"
+                audit.record(
+                    tool_name=tool.name,
+                    input_data=data,
+                    outcome=decision,
+                    approver=approver,
+                    cwd=context.cwd,
+                )
+                return ToolResult(
+                    tool_use_id=tool_call_id,
+                    content=f'Tool "{tool.name}" was {decision}ed by approval policy.',
+                    is_error=True,
+                )
+            if tool.requires_approval or context.config.policy.hitl_mode == "always":
+                approver = "hitl"
+
+            result = await tool.execute(data, context)
+            result.tool_use_id = tool_call_id
+            if not tool.is_read_only and context.config.features.audit_log:
+                audit.record(
+                    tool_name=tool.name,
+                    input_data=data,
+                    outcome="allow" if not result.is_error else "error",
+                    approver=approver,
+                    cwd=context.cwd,
+                )
+            return result
+        except Exception as exc:  # noqa: BLE001 - tool errors must flow back to the model
+            if context.config.features.audit_log and tool and not tool.is_read_only:
+                audit.record(
+                    tool_name=tool.name,
+                    input_data=payload,
