@@ -62,4 +62,15 @@ class Tool:
 
     async def execute(self, payload: dict[str, Any], context: ToolContext) -> ToolResult:
         data = self.validate(payload)
-        return await asyncio.wait_for(self.handler(data, context), timeout=self.timeout)
+        return await asyncio.wait_for(self.handler(data, context), timeout=self.timeout)
+
+
+def object_schema(
+    properties: dict[str, dict[str, Any]],
+    required: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required or [],
+    }
