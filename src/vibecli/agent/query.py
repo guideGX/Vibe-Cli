@@ -137,4 +137,33 @@ def _merge_tool_delta(tool_states: dict[int, dict[str, Any]], delta: dict[str, A
 
 def _finalize_tool_calls(tool_states: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
     calls = []
-    for index in sorted(tool_states):
+    for index in sorted(tool_states):
+        state = tool_states[index]
+        if state["function"]["name"]:
+            calls.append(state)
+    return calls
+
+
+def _tool_input(call: dict[str, Any]) -> dict[str, Any]:
+    raw = call.get("function", {}).get("arguments") or "{}"
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"raw": raw}
+    return parsed if isinstance(parsed, dict) else {"value": parsed}
+
+
+def _tool_name_by_id(calls: list[dict[str, Any]], tool_call_id: str) -> str:
+    for call in calls:
+        if call.get("id") == tool_call_id:
+            return str(call.get("function", {}).get("name") or "unknown")
+    return "unknown"
+
+
+def _prepend_skill_context(user_message: str, skill_context_buffer) -> str:
+    if not skill_context_buffer or skill_context_buffer.is_empty():
+        return user_message
+    drained = skill_context_buffer.drain()
+    if not drained:
+        return user_message
+    return f"{drained}\n\n---\nUser request:\n{user_message}"
