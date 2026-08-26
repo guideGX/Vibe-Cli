@@ -92,4 +92,35 @@ class PlanExecuteAgent:
         plan.mark_started()
         while True:
             executable = _executable_tasks_in_order(plan)
-            if not executable:
+            if not executable:
+                break
+            if len(executable) == 1:
+                result = await self._execute_task(plan, executable[0])
+                async for event in self._apply_task_result(result):
+                    yield event
+                continue
+            yield {
+                "type": "text_delta",
+                "text": (
+                    f"Running parallel batch: {', '.join(task.id for task in executable)}\n\n"
+                ),
+            }
+            results = await asyncio.gather(
+                *(self._execute_task(plan, task) for task in executable),
+                return_exceptions=False,
+            )
+            for result in results:
+                async for event in self._apply_task_result(result):
+                    yield event
+
+        if plan.has_failed():
+            plan.mark_failed()
+            yield {"type": "text_delta", "text": "Plan partially completed with failed tasks.\n\n"}
+        elif plan.is_all_completed():
+            plan.mark_completed()
+            yield {"type": "text_delta", "text": _build_plan_result(plan)}
+        else:
+            plan.mark_failed()
+            yield {
+                "type": "text_delta",
+                "text": "Plan stalled because dependencies were not satisfied.\n\n",
