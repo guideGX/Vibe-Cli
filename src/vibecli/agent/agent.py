@@ -66,4 +66,14 @@ class Agent:
         turns = 0
         async for event in self.run(message):
             if event.get("type") == "text_delta":
-                text += str(event.get("text") or "")
+                text += str(event.get("text") or "")
+            elif event.get("type") == "error":
+                raise event["error"]
+            elif event.get("type") == "done":
+                tokens = int(event.get("total_tokens") or 0)
+                turns = int(event.get("total_turns") or 0)
+        return QueryResult(text=text, total_tokens=tokens, turns=turns)
+
+    def clear_history(self) -> None:
+        self.history = []
+        self.skill_context_buffer.clear()
