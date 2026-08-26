@@ -57,4 +57,31 @@ async def query(
             if event_type == "text_delta":
                 delta = str(event.get("text") or "")
                 text += delta
-                yield {"type": "text_delta", "text": delta}
+                yield {"type": "text_delta", "text": delta}
+            elif event_type == "thinking_delta":
+                delta = str(event.get("thinking") or "")
+                thinking += delta
+                yield {"type": "thinking_delta", "thinking": delta}
+            elif event_type == "tool_call_delta":
+                _merge_tool_delta(tool_states, event["tool_call"])
+            elif event_type == "message_end":
+                stop_reason = str(event.get("stop_reason") or "end_turn")
+            elif event_type == "usage":
+                usage = event.get("usage") or {}
+                usage_input += int(usage.get("input_tokens") or 0)
+                usage_output += int(usage.get("output_tokens") or 0)
+                yield {"type": "usage", "usage": usage}
+            elif event_type == "error":
+                yield {"type": "error", "error": event["error"]}
+                return
+
+        total_tokens += usage_input + usage_output
+        tool_calls = _finalize_tool_calls(tool_states)
+        assistant_message = Message(role="assistant", content=text, tool_calls=tool_calls)
+        if thinking and text:
+            assistant_message.content = text
+        elif thinking:
+            assistant_message.content = ""
+        messages.append(assistant_message)
+        yield {"type": "turn_complete", "turn": turn, "stop_reason": stop_reason}
+
