@@ -84,4 +84,39 @@ async def query(
             assistant_message.content = ""
         messages.append(assistant_message)
         yield {"type": "turn_complete", "turn": turn, "stop_reason": stop_reason}
-
+
+        if stop_reason != "tool_use" and not tool_calls:
+            break
+
+        for call in tool_calls:
+            name = call.get("function", {}).get("name", "unknown")
+            yield {"type": "tool_call", "name": name, "input": _tool_input(call)}
+
+        tool_results = await executor.execute_all(tool_calls, context)
+        for result in tool_results:
+            yield {
+                "type": "tool_result",
+                "name": _tool_name_by_id(tool_calls, result.tool_use_id or ""),
+                "result": result.content,
+                "is_error": result.is_error,
+            }
+            messages.append(
+                Message(
+                    role="tool",
+                    content=result.content,
+                    tool_call_id=result.tool_use_id,
+                )
+            )
+
+    yield {
+        "type": "done",
+        "total_turns": turn,
+        "total_tokens": total_tokens,
+        "messages": messages,
+    }
+
+
+def _merge_tool_delta(tool_states: dict[int, dict[str, Any]], delta: dict[str, Any]) -> None:
+    index = int(delta.get("index") or 0)
+    state = tool_states.setdefault(
+        index,
