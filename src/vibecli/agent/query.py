@@ -119,4 +119,22 @@ async def query(
 def _merge_tool_delta(tool_states: dict[int, dict[str, Any]], delta: dict[str, Any]) -> None:
     index = int(delta.get("index") or 0)
     state = tool_states.setdefault(
-        index,
+        index,
+        {
+            "id": delta.get("id") or f"tool_{index}",
+            "type": "function",
+            "function": {"name": "", "arguments": ""},
+        },
+    )
+    if delta.get("id"):
+        state["id"] = delta["id"]
+    function = delta.get("function") or {}
+    if function.get("name"):
+        state["function"]["name"] = function["name"]
+    if function.get("arguments"):
+        state["function"]["arguments"] += function["arguments"]
+
+
+def _finalize_tool_calls(tool_states: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
+    calls = []
+    for index in sorted(tool_states):
