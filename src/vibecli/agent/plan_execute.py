@@ -56,4 +56,40 @@ class PlanExecuteAgent:
         total_turns = 0
         final_text = ""
         try:
-            yield {"type": "text_delta", "text": f"Planning task: {message}\n\n"}
+            yield {"type": "text_delta", "text": f"Planning task: {message}\n\n"}
+            plan = await self.planner.create_plan(message)
+            yield {"type": "text_delta", "text": plan.summarize() + "\n\n"}
+            async for event in self._execute_plan(plan):
+                if event.get("type") == "usage":
+                    usage = event.get("usage") or {}
+                    total_tokens += int(usage.get("input_tokens") or 0)
+                    total_tokens += int(usage.get("output_tokens") or 0)
+                elif event.get("type") == "plan_task_done":
+                    total_turns += int(event.get("turns") or 0)
+                    continue
+                elif event.get("type") == "text_delta":
+                    final_text += str(event.get("text") or "")
+                yield event
+            self.history = [
+                Message(role="user", content=message),
+                Message(role="assistant", content=final_text),
+            ]
+        except Exception as exc:  # noqa: BLE001
+            yield {"type": "error", "error": exc}
+            return
+        finally:
+            with suppress(Exception):
+                snapshot.create("post-turn")
+        yield {
+            "type": "done",
+            "total_turns": total_turns,
+            "total_tokens": total_tokens,
+            "messages": self.history,
+        }
+
+    async def _execute_plan(self, plan: ExecutionPlan) -> AsyncIterator[dict[str, Any]]:
+        yield {"type": "text_delta", "text": "Executing plan...\n\n"}
+        plan.mark_started()
+        while True:
+            executable = _executable_tasks_in_order(plan)
+            if not executable:
