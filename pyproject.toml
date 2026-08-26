@@ -21,7 +21,6 @@ vibecli = "vibecli.entrypoints.cli:app"
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.2.0",
   "ruff>=0.5.0",
 ]
 
@@ -34,10 +33,6 @@ package = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vibecli"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q"
 
 [tool.ruff]
 line-length = 100

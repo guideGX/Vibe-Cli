@@ -1,357 +1,174 @@
-# VibeCLI Python
+# VibeCLI (Python)
 
-VibeCLI Python 是一个运行在终端里的 AI Agent CLI，面向真实项目开发场景：读写文件、搜索代码、执行命令、联网检索、调用 MCP 工具、保存记忆、生成快照、恢复现场，并通过 Runtime API 对外提供线程、turn、事件和后台任务能力。
+A terminal AI agent CLI written in Python — ReAct loop, Plan-and-Execute, multi-agent
+orchestration, MCP, a durable Runtime API, long-term memory, turn snapshots, a local code
+index, and image input.
 
+This is the Python port of the VibeCLI Java / TypeScript implementations.
+See [`docs/parity.md`](docs/parity.md) for the full parity matrix.
 
+## Requirements
 
-## 功能特性
+- Python >= 3.11
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- Optional: Node.js LTS + `npm`/`npx` (only for Chrome DevTools MCP)
 
-- 交互式终端 Agent，基于 Rich 和 prompt-toolkit 渲染
-- 单次 prompt 模式，适合脚本、管道和自动化调用
-- OpenAI-compatible 流式 LLM 客户端，默认面向 DeepSeek 配置
-- 支持 `DEEPSEEK_API_KEY` 等 provider-specific API Key
-- ReAct 工具调用循环，支持 thinking、tool call、tool result、final output 和 usage 事件
-- Plan-and-Execute 模式，使用独立 Planner 生成 DAG，并按依赖批次执行可并行任务
-- Multi-Agent 协作模式，包含 Planner、Worker、Reviewer、依赖调度、并行 worker 和 review 重试
-- 内置文件、Shell、grep、glob、记忆、网页搜索、网页抓取、代码搜索等工具
-- HITL 人工确认、命令/路径安全策略和 JSONL 审计日志
-- MCP client，支持 stdio 和 Streamable HTTP MCP server
-- Skill 系统，支持内置、用户级和项目级 skill，支持启用/禁用和 `load_skill` 懒加载注入
-- Chrome DevTools MCP 配置助手
-- VibeCLI 自身也可以作为 MCP server 暴露内置工具
-- Runtime API，支持线程、turn、事件日志和持久化后台任务
-- SQLite 长期记忆和本地代码索引
-- Agent run 前后自动创建快照，支持恢复现场
-- 支持本地图片和远程图片输入，并根据模型能力自动降级
-
-## 环境要求
-
-- Python 3.11 或更新版本
-- [uv](https://docs.astral.sh/uv/)
-- 可选：`rg`，用于更快的本地搜索
-- 可选：Chrome DevTools MCP 需要 Node.js 20.19.0 LTS 或更新版本、npm/npx 和 Chrome
-
-## 快速开始
+## Install
 
 ```bash
-git clone https://github.com/itwanger/VibeCLI-Python.git
-cd VibeCLI-Python
-uv sync --extra dev
+# with uv (recommended)
+uv sync
+uv sync --extra dev      # plus ruff
+
+# or with pip
+pip install -e .
+```
+
+For an editable install that exposes the `vibecli` command:
+
+```bash
 uv run vibecli --help
 ```
 
-启动交互模式：
+## Quick start
 
 ```bash
+# 1. Provide an API key (DeepSeek is the default provider)
+export VIBECLI_API_KEY="sk-..."        # macOS / Linux
+set VIBECLI_API_KEY=sk-...             # Windows (cmd)
+$env:VIBECLI_API_KEY="sk-..."          # Windows (PowerShell)
+
+# 2. Check the environment
+uv run vibecli doctor
+
+# 3. Start the REPL
 uv run vibecli
+
+# 4. Or run a single prompt, non-interactive
+uv run vibecli -p "summarize src/vibecli/agent/agent.py"
 ```
 
-单次查询：
+## CLI
 
-```bash
-uv run vibecli -p "帮我总结这个项目"
+| Command | Description |
+| --- | --- |
+| `vibecli` | Start the interactive REPL |
+| `vibecli -p, --prompt <text>` | Print mode: run one prompt and exit |
+| `vibecli -m, --model <name>` | Override the model |
+| `vibecli --provider <name>` | Override the LLM provider |
+| `vibecli --plain` | Plain-text rendering (no Rich UI) |
+| `vibecli --cwd <path>` | Set the working directory |
+| `vibecli --version` | Print the version |
+| `vibecli doctor` | Print an environment / config diagnostic report |
+| `vibecli serve --http --port <port>` | Start the Runtime API over HTTP |
+| `vibecli mcp list` | List configured MCP servers |
+| `vibecli mcp serve --transport stdio\|http` | Expose built-in tools as an MCP server |
+| `vibecli mcp init-chrome` | Write a Chrome DevTools MCP config |
+
+## Configuration
+
+Config is resolved by layering, later sources overriding earlier ones:
+
+1. Built-in defaults
+2. User config — `~/.vibecli/config.json`
+3. Project config — `<project>/.vibecli/config.json`
+4. Project `.env`
+5. CLI overrides (`--provider`, `--model`, `--plain`)
+6. Process environment
+
+### Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `VIBECLI_API_KEY` | Generic API key |
+| `VIBECLI_PROVIDER` | Provider name (`deepseek`, `glm`, `step`, `kimi`, ...) |
+| `VIBECLI_MODEL` | Model name |
+| `VIBECLI_BASE_URL` | Override the API base URL |
+| `VIBECLI_MAX_TOKENS` | Max output tokens |
+| `VIBECLI_TEMPERATURE` | Sampling temperature |
+| `VIBECLI_RENDER_MODE` / `VIBECLI_RENDERER` | `plain` or `inline` |
+| `VIBECLI_MCP` / `VIBECLI_SKILL` / `VIBECLI_MEMORY` | `true` / `false` feature toggles |
+| `VIBECLI_HITL` | Human-in-the-loop mode: `always`, `auto`, `never` |
+| `VIBECLI_RUNTIME_API_KEY` | Required by `vibecli serve` |
+
+Provider-specific keys are also picked up when `VIBECLI_API_KEY` is unset:
+`DEEPSEEK_API_KEY`, `GLM_API_KEY`, `STEP_API_KEY`, `KIMI_API_KEY`, `FREELLMAPI_API_KEY`,
+`XFYUN_API_KEY`, `AGNES_API_KEY`. Per-provider `<PROVIDER>_MODEL` and
+`<PROVIDER>_BASE_URL` are honored as well.
+
+### State files
+
+| Path | Contents |
+| --- | --- |
+| `~/.vibecli/config.json` | User configuration |
+| `~/.vibecli/memory.db` | SQLite long-term memory |
+| `~/.vibecli/audit.jsonl` | JSONL audit log |
+| `~/.vibecli/history/prompt_history.txt` | REPL input history |
+| `~/.vibecli/skills.json` | Disabled-state store for skills |
+
+## REPL slash commands
+
+```
+/help    /exit    /clear   /context  /memory  /save    /config
+/tools   /hitl    /policy  /audit    /index   /search  /plan
+/team    /model   /skill   /mcp      /task    /snapshot /restore
 ```
 
-检查当前环境：
+## Built-in tools
 
-```bash
-uv run vibecli doctor --cwd .
+`read_file`, `write_file`, `list_dir`, `glob` / `glob_files`, `grep` / `grep_code`,
+`bash` / `execute_command`, `web_search`, `web_fetch`, `save_memory`, `load_skill`,
+`search_code`, `revert_turn`.
+
+MCP servers add tools dynamically as `mcp__<server>__<tool>`, plus virtual resource and
+prompt tools.
+
+## Safety
+
+- **PathGuard** — confines file operations to the workspace
+- **CommandGuard** — blocks destructive shell commands (`sudo`, `rm -rf /`, `mkfs`, ...)
+- **HITL** — approval prompts for risky actions, with `always` / `auto` / `never` modes
+- **AuditLog** — every sensitive action appended to `~/.vibecli/audit.jsonl`
+
+## Project layout
+
+```
+src/vibecli/
+  agent/         ReAct agent, Plan-and-Execute, multi-agent orchestrator
+  llm/           OpenAI-compatible streaming client + provider factory
+  tools/         Tool registry, base classes, built-ins, executor
+  mcp/           MCP client, server, config writer (stdio / HTTP)
+  lsp/           Post-write Python syntax diagnostics
+  plan/          Planner + task DAG models
+  policy/        PathGuard, CommandGuard, AuditLog
+  memory/        SQLite long-term memory manager
+  prompt/        System-prompt assembler
+  rag/           SQLite local code index
+  render/        Rich and plain renderers
+  runtime/       HTTP Runtime API + durable task queue
+  skill/         Skill registry and loading
+  snapshot/      pre-turn / post-turn snapshots and restore
+  image/         Image input preprocessing
+  web/           Web search and fetch helpers
+  entrypoints/   CLI entrypoint and REPL
 ```
 
-## 配置
-
-VibeCLI 的配置优先级如下：
-
-1. 内置默认配置
-2. `~/.vibecli/config.json`
-3. 项目级 `.vibecli/config.json`
-4. 项目级 `.env`
-5. CLI 参数
-6. 当前进程环境变量
-
-可以像 Java 项目一样，把 DeepSeek Key 写到项目 `.env` 里：
-
-```dotenv
-VIBECLI_PROVIDER=deepseek
-VIBECLI_MODEL=deepseek-v4-flash
-DEEPSEEK_API_KEY=your_key_here
-```
-
-也可以使用 VibeCLI 通用 Key：
-
-```dotenv
-VIBECLI_PROVIDER=deepseek
-VIBECLI_MODEL=deepseek-v4-flash
-VIBECLI_API_KEY=your_key_here
-```
-
-当前支持的 provider-specific API Key 包括：
-
-- `DEEPSEEK_API_KEY`
-- `GLM_API_KEY`
-- `STEP_API_KEY`
-- `KIMI_API_KEY`
-
-通过命令行临时覆盖 provider 和 model：
-
-```bash
-uv run vibecli --provider deepseek --model deepseek-v4-flash
-```
-
-连接本地 OpenAI-compatible 服务：
-
-```bash
-VIBECLI_PROVIDER=openai-compatible \
-VIBECLI_BASE_URL=http://127.0.0.1:11434/v1 \
-VIBECLI_MODEL=qwen2.5-coder \
-uv run vibecli -p "解释这个仓库"
-```
-
-## 交互命令
-
-进入 `uv run vibecli` 后，可以使用这些 slash commands：
-
-```text
-/help
-/exit
-/clear
-/context
-/memory
-/memory search <query>
-/memory clear
-/save <fact>
-/config
-/tools
-/hitl on|off|always|auto|never
-/policy
-/audit [N]
-/index [path]
-/search <query>
-/plan <task>
-/team <task>
-/model
-/skill
-/skill list
-/skill show <name>
-/skill on <name>
-/skill off <name>
-/skill reload
-/mcp
-/task
-/task add <task>
-/task cancel <task_id>
-/task log <task_id>
-/snapshot
-/snapshot clean
-/restore <snapshot-id-or-index>
-```
-
-## 内置工具
-
-VibeCLI 内置了一组 Agent 可以调用的本地工具和联网工具：
-
-- `read_file`
-- `write_file`
-- `list_dir`
-- `glob` / `glob_files`
-- `grep` / `grep_code`
-- `bash` / `execute_command`
-- `web_search`
-- `web_fetch`
-- `save_memory`
-- `load_skill`
-- `search_code`
-- `revert_turn`
-
-写文件、执行命令、远程 MCP 写操作、恢复快照等危险动作，会经过 policy、HITL 和 audit 处理。
-
-## 联网工具
-
-`web_search` 使用 DuckDuckGo HTML 搜索，返回标题、URL 和摘要。
-
-`web_fetch` 可以抓取公开 HTTP/HTTPS 页面，并做基础正文提取。它会拒绝 `file://`、loopback、私有网络和内网地址，降低 SSRF 风险。
-
-如果需要登录态、浏览器状态或 JS 渲染页面，建议使用 Chrome DevTools MCP。
-
-## MCP
-
-VibeCLI 可以连接 MCP server，并把远端工具动态注册为：
-
-```text
-mcp__<server-name>__<tool-name>
-```
-
-初始化项目级 Chrome DevTools MCP 配置：
-
-```bash
-uv run vibecli mcp init-chrome --scope project
-```
-
-它会写入 `.vibecli/mcp.json`，内容类似：
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--no-usage-statistics"
-      ]
-    }
-  }
-}
-```
-
-连接已有 remote-debugging Chrome：
-
-```bash
-uv run vibecli mcp init-chrome \
-  --scope project \
-  --browser-url http://127.0.0.1:9222
-```
-
-查看已配置的 MCP server：
-
-```bash
-uv run vibecli mcp list
-```
-
-把 VibeCLI 自身作为 MCP server 暴露：
-
-```bash
-uv run vibecli mcp serve --transport stdio
-uv run vibecli mcp serve --transport http --port 3000
-```
-
-HTTP smoke：
-
-```bash
-curl -sS -X POST http://127.0.0.1:3000 \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
-```
-
-Chrome DevTools MCP 会把浏览器页面和 DevTools 状态暴露给 Agent。不要随意把包含个人账号、敏感数据或生产后台的 Chrome 会话授权给 Agent。
-
-## Runtime API
-
-VibeCLI 内置轻量 Runtime API，适合外部系统接入线程、turn、事件和后台任务。
-
-启动服务：
-
-```bash
-VIBECLI_RUNTIME_API_KEY=dev-key \
-uv run vibecli serve --http --port 8080
-```
-
-创建线程：
-
-```bash
-curl -sS -X POST http://127.0.0.1:8080/v1/threads \
-  -H 'x-api-key: dev-key'
-```
-
-发送 turn：
-
-```bash
-curl -sS -X POST http://127.0.0.1:8080/v1/threads/<thread_id>/turns \
-  -H 'content-type: application/json' \
-  -H 'x-api-key: dev-key' \
-  -d '{"message":"总结这个项目"}'
-```
-
-读取事件：
-
-```bash
-curl -sS http://127.0.0.1:8080/v1/threads/<thread_id>/events \
-  -H 'x-api-key: dev-key'
-```
-
-创建并查看后台任务：
-
-```bash
-curl -sS -X POST http://127.0.0.1:8080/v1/tasks \
-  -H 'content-type: application/json' \
-  -H 'x-api-key: dev-key' \
-  -d '{"message":"后台总结这个仓库"}'
-
-curl -sS http://127.0.0.1:8080/v1/tasks \
-  -H 'x-api-key: dev-key'
-```
-
-## 图片输入
-
-VibeCLI 支持在 prompt 里引用图片：
-
-```text
-分析这张截图 @image:./screenshots/page.png
-```
-
-也支持绝对路径和远程图片：
-
-```text
-解释这张图 @image:/Users/me/Desktop/diagram.png
-看看这个图片 @image:https://example.com/image.png
-```
-
-本地图片会自动压缩、缩放，并在需要时把透明底铺成白底，再转为 data URL。如果当前 provider/model 不支持多模态输入，VibeCLI 会自动降级为文本元信息，不会把不支持的图片 payload 发给模型。
-
-## 快照
-
-每次 Agent run 都会尽力创建项目快照：
-
-- `pre-turn`
-- `post-turn`
-
-快照保存在 `~/.vibecli/snapshots/`，不会写入项目 `.git`。
-
-REPL 中可以使用：
-
-```text
-/snapshot
-/restore 1
-/snapshot clean
-```
-
-## SDK
-
-```python
-from vibecli.sdk import create_default_engine
-
-engine = create_default_engine(cwd=".")
-result = engine.ask_complete("解释这个项目")
-print(result.text)
-
-plan_result = engine.plan_complete("先读取 README，再总结项目结构")
-team_result = engine.team_complete("让多个 Agent 并行检查核心模块")
-```
-
-## 开发
-
-安装开发依赖：
+## Development
 
 ```bash
 uv sync --extra dev
-```
-
-运行检查：
-
-```bash
-uv run python -m ruff check .
-uv run python -m ruff format --check .
-uv run python -m pytest
+uv run --extra dev ruff check .
+uv run --extra dev ruff format .
 uv build
-```
-
-常用 smoke：
-
-```bash
-uv run vibecli --version
 uv run vibecli --help
-uv run vibecli doctor --cwd .
-uv run vibecli --plain -p hello
 ```
 
+## Notes
+
+- Project memory files: `VIBE.md`, `.vibecli/VIBE.md`, and their `.local.md` variants.
+- The Java implementation ships a private WeChat iLink channel; the Python port
+  intentionally does not, since it needs private credentials and protocol details.
+
+## License
+
+MIT

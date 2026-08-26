@@ -8,6 +8,5 @@ __pycache__/
 .ruff_cache/
 dist/
 build/
-.paicli/
 .vibecli/
 .workbuddy/
