@@ -123,4 +123,46 @@ class PlanExecuteAgent:
             plan.mark_failed()
             yield {
                 "type": "text_delta",
-                "text": "Plan stalled because dependencies were not satisfied.\n\n",
+                "text": "Plan stalled because dependencies were not satisfied.\n\n",
+            }
+
+    async def _apply_task_result(self, result: TaskRunResult) -> AsyncIterator[dict[str, Any]]:
+        if result.error:
+            result.task.mark_failed(str(result.error))
+            yield {"type": "text_delta", "text": f"Failed [{result.task.id}]: {result.error}\n\n"}
+            return
+        result.task.mark_completed(result.text)
+        yield {
+            "type": "text_delta",
+            "text": f"Completed [{result.task.id}]: {_preview(result.text)}\n\n",
+        }
+        yield {
+            "type": "usage",
+            "usage": {"input_tokens": result.tokens, "output_tokens": 0},
+        }
+        yield {"type": "plan_task_done", "turns": result.turns, "tokens": result.tokens}
+
+    async def _execute_task(self, plan: ExecutionPlan, task: Task) -> TaskRunResult:
+        task.mark_started()
+        text = ""
+        tool_results: list[str] = []
+        tokens = 0
+        turns = 0
+        try:
+            async for event in query(
+                llm_client=self.llm_client,
+                tool_registry=self.tool_registry,
+                system_prompt=self._task_system_prompt(task),
+                user_message=_task_context(plan, task),
+                history=[],
+                cwd=self.cwd,
+                config=self.config,
+                approval_callback=self.approval_callback,
+                skill_context_buffer=self.skill_context_buffer,
+                max_turns=self.max_task_turns,
+            ):
+                if event.get("type") == "text_delta":
+                    text += str(event.get("text") or "")
+                elif event.get("type") == "tool_result":
+                    content = str(event.get("result") or "")
+                    if content:
