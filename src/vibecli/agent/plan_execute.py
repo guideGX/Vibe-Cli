@@ -165,4 +165,46 @@ class PlanExecuteAgent:
                     text += str(event.get("text") or "")
                 elif event.get("type") == "tool_result":
                     content = str(event.get("result") or "")
-                    if content:
+                    if content:
+                        tool_results.append(content)
+                elif event.get("type") == "usage":
+                    usage = event.get("usage") or {}
+                    tokens += int(usage.get("input_tokens") or 0)
+                    tokens += int(usage.get("output_tokens") or 0)
+                elif event.get("type") == "done":
+                    turns += int(event.get("total_turns") or 0)
+                elif event.get("type") == "error":
+                    raise event["error"]
+            result_text = text.strip() or "\n".join(tool_results).strip()
+            return TaskRunResult(task=task, text=result_text, tokens=tokens, turns=turns)
+        except Exception as exc:  # noqa: BLE001
+            return TaskRunResult(task=task, text="", tokens=tokens, turns=turns, error=exc)
+
+    def _task_system_prompt(self, task: Task) -> str:
+        base = PromptAssembler(
+            config=self.config,
+            cwd=self.cwd,
+            tool_names=self.tool_registry.list_names(),
+            model=self.llm_client.model_name,
+            provider=self.llm_client.provider_name,
+        ).build()
+        return (
+            base
+            + "\n\nYou are executing one task inside a Plan-and-Execute DAG.\n"
+            + f"Task id: {task.id}\nTask type: {task.type.value}\n"
+            + "Complete this task concretely. Use tools when needed."
+        )
+
+
+def _executable_tasks_in_order(plan: ExecutionPlan) -> list[Task]:
+    executable_ids = {task.id for task in plan.executable_tasks()}
+    return [plan.tasks[task_id] for task_id in plan.execution_order() if task_id in executable_ids]
+
+
+def _task_context(plan: ExecutionPlan, task: Task) -> str:
+    lines = [
+        f"Goal: {plan.goal}",
+        f"Current task [{task.id}]: {task.description}",
+        "",
+        "Completed dependency results:",
+    ]
