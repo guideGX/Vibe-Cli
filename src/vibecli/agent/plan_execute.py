@@ -207,4 +207,25 @@ def _task_context(plan: ExecutionPlan, task: Task) -> str:
         f"Current task [{task.id}]: {task.description}",
         "",
         "Completed dependency results:",
-    ]
+    ]
+    for dep_id in task.dependencies:
+        dep = plan.get_task(dep_id)
+        if dep and dep.status == TaskStatus.COMPLETED:
+            lines.append(f"- [{dep.id}] {dep.description}: {_preview(dep.result, 800)}")
+    return "\n".join(lines)
+
+
+def _build_plan_result(plan: ExecutionPlan) -> str:
+    lines = ["Plan execution completed.", "", "Task summary:"]
+    for task in plan.all_tasks():
+        lines.append(f"- [{task.id}] {task.status.value}: {task.description}")
+        if task.result:
+            lines.append(f"  Result: {_preview(task.result)}")
+    return "\n".join(lines) + "\n"
+
+
+def _preview(text: str, max_len: int = 160) -> str:
+    value = (text or "").replace("\r\n", "\n").strip()
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 3] + "..."
