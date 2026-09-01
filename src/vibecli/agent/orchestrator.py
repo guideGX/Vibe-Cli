@@ -94,4 +94,29 @@ class SubAgent:
         skill_context_buffer: SkillContextBuffer | None = None,
     ):
         self.name = name
-        self.role = role
+        self.role = role
+        self.llm_client = llm_client
+        self.tool_registry = tool_registry
+        self.config = config
+        self.cwd = cwd
+        self.approval_callback = approval_callback
+        self.skill_context_buffer = skill_context_buffer or SkillContextBuffer()
+        self.history: list[Message] = []
+
+    async def execute(self, task: AgentMessage, context: str = "") -> AgentMessage:
+        content = f"{context}\n\nCurrent task:\n{task.content}".strip() if context else task.content
+        if self.role == AgentRole.WORKER:
+            return await self._execute_worker(content)
+        return await self._execute_without_tools(content)
+
+    async def review(self, original_task: str, execution_result: str) -> AgentMessage:
+        return await self.execute(
+            AgentMessage.task(
+                "orchestrator",
+                f"Original task:\n{original_task}\n\nExecution result:\n{execution_result}",
+            )
+        )
+
+    def clear_history(self) -> None:
+        self.history = []
+
