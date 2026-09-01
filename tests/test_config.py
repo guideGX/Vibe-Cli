@@ -34,4 +34,9 @@ def test_config_precedence(tmp_path, monkeypatch):
 def test_provider_specific_api_key(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("VIBECLI_PROVIDER", "deepseek")
-    monkeypatch.delenv("VIBECLI_API_KEY", raising=False)
+    monkeypatch.delenv("VIBECLI_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-key")
+
+    config = load_config(project_root=tmp_path)
+
+    assert config.llm.api_key == "deepseek-key"
