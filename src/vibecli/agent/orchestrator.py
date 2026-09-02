@@ -337,4 +337,43 @@ class AgentOrchestrator:
             accepted_result = retry_result.content
             retry_review = await reviewer.review(step.description, accepted_result)
             reviewer.clear_history()
-            approved = self.parse_review_approval(retry_review.content)
+            approved = self.parse_review_approval(retry_review.content)
+            issues = self.parse_review_issues(retry_review.content)
+
+        self._update_step(steps, step.id, step.with_result(accepted_result))
+
+    def parse_plan(self, plan_json: str) -> list[ExecutionStep]:
+        try:
+            data = _parse_json_object(plan_json)
+        except (json.JSONDecodeError, ValueError):
+            return []
+        nodes = data.get("steps") or data.get("tasks") or []
+        if not isinstance(nodes, list) or not nodes:
+            return []
+        id_mapping: dict[str, str] = {}
+        steps: list[ExecutionStep] = []
+        for index, node in enumerate(nodes, start=1):
+            if not isinstance(node, dict):
+                continue
+            original_id = str(node.get("id") or f"step_{index}")
+            new_id = f"step_{index}"
+            id_mapping[original_id] = new_id
+            steps.append(
+                ExecutionStep(
+                    id=new_id,
+                    description=str(node.get("description") or original_id),
+                    type=str(node.get("type") or "COMMAND"),
+                    dependencies=[],
+                )
+            )
+        for index, node in enumerate(nodes, start=1):
+            if not isinstance(node, dict) or index > len(steps):
+                continue
+            raw_deps = node.get("dependencies") or []
+            if not isinstance(raw_deps, list):
+                continue
+            steps[index - 1].dependencies = [
+                id_mapping.get(str(dep), str(dep)) for dep in raw_deps if str(dep)
+            ]
+        return steps
+
