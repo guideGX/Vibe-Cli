@@ -119,4 +119,35 @@ class SubAgent:
 
     def clear_history(self) -> None:
         self.history = []
-
+
+    async def _execute_worker(self, content: str) -> AgentMessage:
+        text = ""
+        tool_results: list[str] = []
+        try:
+            async for event in query(
+                llm_client=self.llm_client,
+                tool_registry=self.tool_registry,
+                system_prompt=self._system_prompt(),
+                user_message=content,
+                history=self.history,
+                cwd=self.cwd,
+                config=self.config,
+                approval_callback=self.approval_callback,
+                skill_context_buffer=self.skill_context_buffer,
+                max_turns=8,
+            ):
+                if event.get("type") == "text_delta":
+                    text += str(event.get("text") or "")
+                elif event.get("type") == "tool_result":
+                    tool_results.append(str(event.get("result") or ""))
+                elif event.get("type") == "done":
+                    self.history = list(event.get("messages") or [])
+                elif event.get("type") == "error":
+                    raise event["error"]
+        except Exception as exc:  # noqa: BLE001
+            return AgentMessage.error(self.name, self.role, str(exc))
+        result = text.strip() or "\n".join(item for item in tool_results if item).strip()
+        return AgentMessage.result(self.name, self.role, result)
+
+    async def _execute_without_tools(self, content: str) -> AgentMessage:
+        text = ""
