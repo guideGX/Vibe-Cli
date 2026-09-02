@@ -476,4 +476,19 @@ class AgentOrchestrator:
                 steps[index] = updated
                 return
 
-
+
+def _parse_json_object(text: str) -> dict[str, Any]:
+    cleaned = re.sub(r"```(?:json)?\s*", "", text or "").replace("```", "").strip()
+    if not cleaned:
+        raise ValueError("empty JSON")
+    data = json.loads(cleaned)
+    if not isinstance(data, dict):
+        raise ValueError("JSON root must be an object")
+    return data
+
+
+def _preview(text: str, max_len: int = 160) -> str:
+    value = (text or "").replace("\r\n", "\n").strip()
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 3] + "..."
