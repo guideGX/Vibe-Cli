@@ -410,4 +410,35 @@ class AgentOrchestrator:
         except (json.JSONDecodeError, ValueError):
             return "review rejected the result"
         for key in ("issues", "suggestions"):
-            value = data.get(key)
+            value = data.get(key)
+            if isinstance(value, list) and value:
+                return "\n".join(f"- {item}" for item in value)
+        return str(data.get("summary") or "review rejected the result")
+
+    def build_step_context(self, steps: list[ExecutionStep], current_step: ExecutionStep) -> str:
+        lines = ["Overall task context:"]
+        for step in steps:
+            if step.id in current_step.dependencies and step.status == StepStatus.COMPLETED:
+                lines.append(f"[{step.id}] {step.description}")
+                if step.result:
+                    lines.append(f"Result: {_preview(step.result, 500)}")
+        return "\n".join(lines)
+
+    def summarize_steps(self, steps: list[ExecutionStep]) -> str:
+        lines = ["Execution plan:"]
+        for step in steps:
+            deps = ", ".join(step.dependencies) if step.dependencies else "none"
+            lines.append(f"- [{step.id}] {step.description} ({step.type}, deps: {deps})")
+        return "\n".join(lines)
+
+    def build_final_result(self, steps: list[ExecutionStep]) -> str:
+        all_completed = all(step.status == StepStatus.COMPLETED for step in steps)
+        failed = any(step.status == StepStatus.FAILED for step in steps)
+        if all_completed:
+            header = "Multi-Agent task completed."
+        elif failed:
+            header = "Multi-Agent task did not fully complete; failed steps remain."
+        else:
+            header = "Multi-Agent task partially completed; pending steps remain."
+        lines = [header, "", "Execution summary:"]
+        for step in steps:
