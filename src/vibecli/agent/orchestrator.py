@@ -268,4 +268,28 @@ class AgentOrchestrator:
 
         while True:
             executable = self.get_executable_steps(steps)
-            if not executable:
+            if not executable:
+                break
+            if len(executable) > 1:
+                events.append(
+                    event_factory(
+                        f"Parallel batch: {', '.join(step.id for step in executable)}\n\n"
+                    )
+                )
+            await asyncio.gather(
+                *(
+                    self._run_step_with_worker_queue(
+                        step,
+                        steps,
+                        retry_count,
+                        worker_queue,
+                    )
+                    for step in executable
+                )
+            )
+        return events
+
+    async def _run_step_with_worker_queue(
+        self,
+        step: ExecutionStep,
+        steps: list[ExecutionStep],
