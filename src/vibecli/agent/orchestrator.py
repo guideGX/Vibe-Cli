@@ -376,4 +376,38 @@ class AgentOrchestrator:
                 id_mapping.get(str(dep), str(dep)) for dep in raw_deps if str(dep)
             ]
         return steps
-
+
+    def get_executable_steps(self, steps: list[ExecutionStep]) -> list[ExecutionStep]:
+        status = {step.id: step.status for step in steps}
+        return [
+            step
+            for step in steps
+            if step.status == StepStatus.PENDING
+            and all(status.get(dep) == StepStatus.COMPLETED for dep in step.dependencies)
+        ]
+
+    def parse_review_approval(self, review_content: str | None) -> bool:
+        if not review_content:
+            return False
+        try:
+            data = _parse_json_object(review_content)
+            if "approved" not in data:
+                return False
+            return bool(data.get("approved"))
+        except (json.JSONDecodeError, ValueError):
+            lower = review_content.lower()
+            negative = ["未通过", "不通过", "不合格", "有问题", '"approved": false']
+            positive = ["通过", "合格", '"approved": true']
+            if any(item in lower for item in negative):
+                return False
+            return any(item in lower for item in positive)
+
+    def parse_review_issues(self, review_content: str | None) -> str:
+        if not review_content:
+            return ""
+        try:
+            data = _parse_json_object(review_content)
+        except (json.JSONDecodeError, ValueError):
+            return "review rejected the result"
+        for key in ("issues", "suggestions"):
+            value = data.get(key)
