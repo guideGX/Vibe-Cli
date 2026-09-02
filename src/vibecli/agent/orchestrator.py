@@ -225,4 +225,47 @@ class AgentOrchestrator:
             snapshot.create("pre-turn")
         final_text = ""
         try:
-            yield {"type": "text_delta", "text": "Phase 1: planner\n\n"}
+            yield {"type": "text_delta", "text": "Phase 1: planner\n\n"}
+            plan_result = await self.planner.execute(
+                AgentMessage.task("orchestrator", f"Create an execution plan for:\n{message}")
+            )
+            self.planner.clear_history()
+            if plan_result.type == AgentMessageType.ERROR:
+                raise RuntimeError(f"planner failed: {plan_result.content}")
+            steps = self.parse_plan(plan_result.content)
+            if not steps:
+                raise ValueError(f"planner output could not be parsed:\n{plan_result.content}")
+            yield {"type": "text_delta", "text": self.summarize_steps(steps) + "\n"}
+            yield {"type": "text_delta", "text": "Phase 2: workers and reviewer\n\n"}
+            for event in await self._execute_steps(
+                steps, lambda text: {"type": "text_delta", "text": text}
+            ):
+                yield event
+            final_text = self.build_final_result(steps)
+            yield {"type": "text_delta", "text": final_text}
+            self.history = [
+                Message(role="user", content=message),
+                Message(role="assistant", content=final_text),
+            ]
+        except Exception as exc:  # noqa: BLE001
+            yield {"type": "error", "error": exc}
+            return
+        finally:
+            with suppress(Exception):
+                snapshot.create("post-turn")
+        yield {"type": "done", "total_turns": 0, "total_tokens": 0, "messages": self.history}
+
+    async def _execute_steps(
+        self,
+        steps: list[ExecutionStep],
+        event_factory,
+    ) -> list[dict[str, Any]]:
+        events: list[dict[str, Any]] = []
+        retry_count: dict[str, int] = {}
+        worker_queue: asyncio.Queue[SubAgent] = asyncio.Queue()
+        for worker in self.workers:
+            worker_queue.put_nowait(worker)
+
+        while True:
+            executable = self.get_executable_steps(steps)
+            if not executable:
