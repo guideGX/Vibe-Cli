@@ -441,4 +441,21 @@ class AgentOrchestrator:
         else:
             header = "Multi-Agent task partially completed; pending steps remain."
         lines = [header, "", "Execution summary:"]
-        for step in steps:
+        for step in steps:
+            icon = {
+                StepStatus.COMPLETED: "COMPLETED",
+                StepStatus.FAILED: "FAILED",
+                StepStatus.PENDING: "PENDING",
+                StepStatus.RUNNING: "RUNNING",
+            }[step.status]
+            lines.append(f"- [{step.id}] {icon}: {step.description}")
+            if step.result:
+                lines.append(f"  Result: {_preview(step.result)}")
+        return "\n".join(lines) + "\n"
+
+    def _subagent(self, name: str, role: AgentRole) -> SubAgent:
+        return SubAgent(
+            name=name,
+            role=role,
+            llm_client=self.llm_client,
+            tool_registry=self.tool_registry,
