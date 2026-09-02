@@ -204,4 +204,25 @@ class AgentOrchestrator:
         cwd: str,
         approval_callback=None,
         worker_count: int = 2,
-    ):
+    ):
+        self.llm_client = llm_client
+        self.tool_registry = tool_registry
+        self.config = config
+        self.cwd = cwd
+        self.approval_callback = approval_callback
+        self.skill_context_buffer = SkillContextBuffer()
+        self.planner = self._subagent("planner", AgentRole.PLANNER)
+        self.workers = [
+            self._subagent(f"worker-{index}", AgentRole.WORKER)
+            for index in range(1, max(1, worker_count) + 1)
+        ]
+        self.reviewer = self._subagent("reviewer", AgentRole.REVIEWER)
+        self.history: list[Message] = []
+
+    async def run(self, message: str) -> AsyncIterator[dict[str, Any]]:
+        snapshot = SnapshotService(self.cwd)
+        with suppress(Exception):
+            snapshot.create("pre-turn")
+        final_text = ""
+        try:
+            yield {"type": "text_delta", "text": "Phase 1: planner\n\n"}
