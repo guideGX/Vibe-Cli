@@ -292,4 +292,49 @@ class AgentOrchestrator:
     async def _run_step_with_worker_queue(
         self,
         step: ExecutionStep,
-        steps: list[ExecutionStep],
+        steps: list[ExecutionStep],
+        retry_count: dict[str, int],
+        worker_queue: asyncio.Queue[SubAgent],
+    ) -> None:
+        worker = await worker_queue.get()
+        try:
+            reviewer = self._subagent(f"reviewer-{step.id}", AgentRole.REVIEWER)
+            await self._run_step(step, steps, retry_count, worker, reviewer)
+        finally:
+            worker.clear_history()
+            worker_queue.put_nowait(worker)
+
+    async def _run_step(
+        self,
+        step: ExecutionStep,
+        steps: list[ExecutionStep],
+        retry_count: dict[str, int],
+        worker: SubAgent,
+        reviewer: SubAgent,
+    ) -> None:
+        self._update_step(steps, step.id, step.started())
+        context = self.build_step_context(steps, step)
+        task_msg = AgentMessage.task("orchestrator", step.description)
+        result = await worker.execute(task_msg, context)
+        if result.type == AgentMessageType.ERROR or not result.content.strip():
+            self._update_step(steps, step.id, step.with_failed(result.content or "empty result"))
+            return
+
+        accepted_result = result.content
+        review = await reviewer.review(step.description, accepted_result)
+        reviewer.clear_history()
+        approved = self.parse_review_approval(review.content)
+        issues = self.parse_review_issues(review.content)
+        retries = retry_count.get(step.id, 0)
+        while not approved and retries < self.max_retries_per_step:
+            retries += 1
+            retry_count[step.id] = retries
+            retry_context = context + f"\n\nReviewer rejected the previous result:\n{issues}"
+            retry_result = await worker.execute(task_msg, retry_context)
+            if retry_result.type == AgentMessageType.ERROR or not retry_result.content.strip():
+                issues = retry_result.content or "empty retry result"
+                continue
+            accepted_result = retry_result.content
+            retry_review = await reviewer.review(step.description, accepted_result)
+            reviewer.clear_history()
+            approved = self.parse_review_approval(retry_review.content)
