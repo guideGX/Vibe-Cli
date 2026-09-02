@@ -458,4 +458,22 @@ class AgentOrchestrator:
             name=name,
             role=role,
             llm_client=self.llm_client,
-            tool_registry=self.tool_registry,
+            tool_registry=self.tool_registry,
+            config=self.config,
+            cwd=self.cwd,
+            approval_callback=self.approval_callback,
+            skill_context_buffer=self.skill_context_buffer,
+        )
+
+    def _update_step(
+        self,
+        steps: list[ExecutionStep],
+        step_id: str,
+        updated: ExecutionStep,
+    ) -> None:
+        for index, step in enumerate(steps):
+            if step.id == step_id:
+                steps[index] = updated
+                return
+
+
