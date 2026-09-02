@@ -150,4 +150,40 @@ class SubAgent:
         return AgentMessage.result(self.name, self.role, result)
 
     async def _execute_without_tools(self, content: str) -> AgentMessage:
-        text = ""
+        text = ""
+        messages = [*self.history, Message(role="user", content=content)]
+        try:
+            async for event in self.llm_client.chat(
+                messages,
+                [],
+                system_prompt=self._system_prompt(),
+            ):
+                if event.get("type") == "text_delta":
+                    text += str(event.get("text") or "")
+                elif event.get("type") == "error":
+                    raise event["error"]
+        except Exception as exc:  # noqa: BLE001
+            return AgentMessage.error(self.name, self.role, str(exc))
+        self.history = [*messages, Message(role="assistant", content=text)]
+        return AgentMessage.result(self.name, self.role, text)
+
+    def _system_prompt(self) -> str:
+        base = PromptAssembler(
+            config=self.config,
+            cwd=self.cwd,
+            tool_names=self.tool_registry.list_names(),
+            model=self.llm_client.model_name,
+            provider=self.llm_client.provider_name,
+        ).build()
+        role_prompt = {
+            AgentRole.PLANNER: (
+                "You are the Planner in a multi-agent workflow. Return only JSON with a "
+                "steps array. Each step needs id, description, type, and dependencies."
+            ),
+            AgentRole.WORKER: (
+                "You are the Worker in a multi-agent workflow. Execute only the assigned "
+                "step. Use tools when needed and return the concrete result."
+            ),
+            AgentRole.REVIEWER: (
+                "You are the Reviewer in a multi-agent workflow. Return JSON only: "
+                '{"approved": true|false, "summary": "...", "issues": []}.'
