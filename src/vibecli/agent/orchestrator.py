@@ -186,4 +186,22 @@ class SubAgent:
             ),
             AgentRole.REVIEWER: (
                 "You are the Reviewer in a multi-agent workflow. Return JSON only: "
-                '{"approved": true|false, "summary": "...", "issues": []}.'
+                '{"approved": true|false, "summary": "...", "issues": []}.'
+            ),
+        }[self.role]
+        return f"{base}\n\n{role_prompt}\nAgent name: {self.name}"
+
+
+class AgentOrchestrator:
+    max_retries_per_step = 2
+
+    def __init__(
+        self,
+        *,
+        llm_client: LlmClient,
+        tool_registry: ToolRegistry,
+        config: VibeCliConfig,
+        cwd: str,
+        approval_callback=None,
+        worker_count: int = 2,
+    ):
