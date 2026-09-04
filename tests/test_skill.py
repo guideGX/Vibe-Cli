@@ -70,4 +70,15 @@ def test_load_skill_pushes_body_into_context_buffer(tmp_path, monkeypatch):
 def _write_skill(
     root: Path,
     name: str,
-    desc: str,
+    desc: str,
+    version: str,
+    *,
+    body: str | None = None,
+) -> None:
+    skill_dir = root / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_dir.joinpath("SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: {desc}\nversion: {version}\n---\n"
+        f"{body or f'body for {name}'}\n",
+        encoding="utf-8",
+    )
