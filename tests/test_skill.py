@@ -38,4 +38,36 @@ def test_skill_registry_layers_and_state(tmp_path, monkeypatch):
 
 def test_skill_context_buffer_is_one_shot_and_capped():
     buffer = SkillContextBuffer(limit=3)
-    buffer.push("a", "A")
+    buffer.push("a", "A")
+    buffer.push("b", "B")
+    buffer.push("c", "C")
+    buffer.push("d", "D")
+
+    drained = buffer.drain()
+
+    assert "Loaded Skill: a" not in drained
+    assert "Loaded Skill: b" in drained
+    assert "Loaded Skill: c" in drained
+    assert "Loaded Skill: d" in drained
+    assert buffer.drain() == ""
+
+
+def test_load_skill_pushes_body_into_context_buffer(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    _write_skill(tmp_path / ".vibecli" / "skills", "demo", "demo desc", "v1", body="demo body")
+    config = load_config(project_root=tmp_path)
+    buffer = SkillContextBuffer()
+    context = ToolContext(cwd=str(tmp_path), config=config, skill_context_buffer=buffer)
+
+    result = asyncio.run(load_skill({"name": "demo"}, context))
+
+    assert not result.is_error
+    drained = buffer.drain()
+    assert "Loaded Skill: demo" in drained
+    assert "demo body" in drained
+
+
+def _write_skill(
+    root: Path,
+    name: str,
+    desc: str,
