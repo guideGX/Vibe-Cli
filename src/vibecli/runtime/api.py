@@ -21,4 +21,28 @@ from vibecli.runtime.tasks import DurableTaskManager
 
 class RuntimeApiServer:
     def __init__(
-        self,
+        self,
+        *,
+        cwd: str,
+        config: VibeCliConfig,
+        api_key: str,
+        port: int = 8080,
+        workers: int = 2,
+    ):
+        self.cwd = str(Path(cwd).resolve())
+        self.config = config
+        self.api_key = api_key
+        self.port = port
+        self.db_path = Path.home() / ".vibecli" / "runtime" / "runtime.db"
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.task_manager = DurableTaskManager(Path.home() / ".vibecli" / "tasks" / "tasks.db")
+        self.workers = workers
+        self._stop = threading.Event()
+        self._ensure_schema()
+
+    def serve_forever(self) -> None:
+        for index in range(self.workers):
+            thread = threading.Thread(
+                target=self._worker_loop,
+                name=f"vibecli-task-{index}",
+                daemon=True,
