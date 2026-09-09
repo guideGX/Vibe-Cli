@@ -135,4 +135,25 @@ class RuntimeApiServer:
     def _worker_loop(self) -> None:
         while not self._stop.is_set():
             task = self.task_manager.claim_next()
-            if not task:
+            if not task:
+                time.sleep(0.5)
+                continue
+            try:
+                result = asyncio.run(self._run_task(task.prompt))
+                self.task_manager.complete(task.id, result)
+            except Exception as exc:  # noqa: BLE001
+                self.task_manager.fail(task.id, str(exc))
+
+    async def _run_task(self, prompt: str) -> str:
+        self._ensure_llm_key()
+        registry, _manager = await build_tool_registry(config=self.config, cwd=self.cwd)
+        engine = QueryEngine(
+            llm_client=create_llm_client(self.config.llm),
+            tool_registry=registry,
+            config=self.config,
+            cwd=self.cwd,
+        )
+        return (await engine.ask_complete_async(prompt)).text
+
+    def _ensure_llm_key(self) -> None:
+        if not self.config.llm.api_key:
