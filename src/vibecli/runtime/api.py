@@ -156,4 +156,26 @@ class RuntimeApiServer:
         return (await engine.ask_complete_async(prompt)).text
 
     def _ensure_llm_key(self) -> None:
-        if not self.config.llm.api_key:
+        if not self.config.llm.api_key:
+            raise ValueError(
+                "VIBECLI_API_KEY is not configured. Runtime turns/tasks need a working LLM key."
+            )
+
+    def _authorized(self, request: BaseHTTPRequestHandler) -> bool:
+        auth = request.headers.get("authorization", "")
+        token = request.headers.get("x-api-key", "")
+        return auth == f"Bearer {self.api_key}" or token == self.api_key
+
+    def _create_thread(self) -> str:
+        thread_id = f"thread_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        with self._connect() as conn:
+            conn.execute(
+                "insert into threads(id, created_at) values (?, ?)",
+                (thread_id, datetime.now(UTC).isoformat()),
+            )
+        self._append_event(thread_id, "thread.created", {"id": thread_id})
+        return thread_id
+
+    def _append_event(self, thread_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        with self._connect() as conn:
+            conn.execute(
