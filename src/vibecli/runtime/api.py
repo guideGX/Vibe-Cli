@@ -266,4 +266,9 @@ def _jsonable(event: dict[str, Any]) -> dict[str, Any]:
             result[key] = str(value)
     return result
 
-
+
+def runtime_api_key(explicit: str | None = None) -> str:
+    key = explicit or os.environ.get("VIBECLI_RUNTIME_API_KEY")
+    if not key:
+        raise ValueError("VIBECLI_RUNTIME_API_KEY is required for Runtime API")
+    return key
