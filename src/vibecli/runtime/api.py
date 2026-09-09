@@ -230,4 +230,40 @@ class RuntimeApiServer:
                     payload text not null,
                     created_at text not null
                 )
-                """
+                """
+            )
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
+
+
+def _read_json(request: BaseHTTPRequestHandler) -> dict[str, Any]:
+    length = int(request.headers.get("content-length") or 0)
+    if length == 0:
+        return {}
+    try:
+        value = json.loads(request.rfile.read(length).decode("utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _send_json(request: BaseHTTPRequestHandler, status: int, payload: dict[str, Any]) -> None:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request.send_response(status)
+    request.send_header("content-type", "application/json")
+    request.send_header("content-length", str(len(body)))
+    request.end_headers()
+    request.wfile.write(body)
+
+
+def _jsonable(event: dict[str, Any]) -> dict[str, Any]:
+    result = {}
+    for key, value in event.items():
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            result[key] = value
+        else:
+            result[key] = str(value)
+    return result
+
+
