@@ -67,4 +67,46 @@ class RuntimeApiServer:
             server.serve_forever()
         finally:
             self._stop.set()
-
+
+    def _handle(self, request: BaseHTTPRequestHandler) -> None:
+        if not self._authorized(request):
+            _send_json(request, 401, {"error": "unauthorized"})
+            return
+        method = request.command
+        path = request.path.split("?", 1)[0]
+        body = _read_json(request)
+        try:
+            if method == "POST" and path == "/v1/threads":
+                thread_id = self._create_thread()
+                _send_json(request, 200, {"id": thread_id})
+            elif method == "POST" and path.startswith("/v1/threads/") and path.endswith("/turns"):
+                thread_id = path.split("/")[3]
+                message = str(body.get("message") or body.get("prompt") or "")
+                if not message:
+                    _send_json(request, 400, {"error": "message is required"})
+                    return
+                result = asyncio.run(self._run_turn(thread_id, message))
+                _send_json(request, 200, result)
+            elif method == "GET" and path.startswith("/v1/threads/") and path.endswith("/events"):
+                thread_id = path.split("/")[3]
+                self._send_events(request, thread_id)
+            elif method == "POST" and path == "/v1/tasks":
+                prompt = str(body.get("message") or body.get("prompt") or "")
+                if not prompt:
+                    _send_json(request, 400, {"error": "message is required"})
+                    return
+                task_id = self.task_manager.add(prompt)
+                _send_json(request, 200, {"id": task_id, "status": "queued"})
+            elif method == "GET" and path == "/v1/tasks":
+                _send_json(request, 200, {"tasks": [asdict(t) for t in self.task_manager.list()]})
+            elif method == "GET" and path.startswith("/v1/tasks/"):
+                task = self.task_manager.get(path.split("/")[3])
+                payload = asdict(task) if task else {"error": "not found"}
+                _send_json(request, 200 if task else 404, payload)
+            elif method == "POST" and path.startswith("/v1/tasks/") and path.endswith("/cancel"):
+                task_id = path.split("/")[3]
+                _send_json(request, 200, {"canceled": self.task_manager.cancel(task_id)})
+            else:
+                _send_json(request, 404, {"error": "not found"})
+        except Exception as exc:  # noqa: BLE001 - API boundary
+            _send_json(request, 500, {"error": str(exc)})
