@@ -39,4 +39,27 @@ def _validate_public_url(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise NetworkPolicyError("only http/https URLs are allowed")
-    if not parsed.hostname:
+    if not parsed.hostname:
+        raise NetworkPolicyError("URL must include a hostname")
+    host = parsed.hostname
+    try:
+        ip = ipaddress.ip_address(host)
+        _reject_private_ip(ip)
+        return
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror as exc:
+        raise NetworkPolicyError(f"cannot resolve host: {host}") from exc
+    for info in infos:
+        address = info[4][0]
+        try:
+            _reject_private_ip(ipaddress.ip_address(address))
+        except ValueError:
+            continue
+
+
+def _reject_private_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
+    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
+        raise NetworkPolicyError("URL resolves to a private or local address")
