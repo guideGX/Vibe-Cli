@@ -178,4 +178,29 @@ class RuntimeApiServer:
 
     def _append_event(self, thread_id: str, event_type: str, payload: dict[str, Any]) -> None:
         with self._connect() as conn:
-            conn.execute(
+            conn.execute(
+                """
+                insert into events(thread_id, type, payload, created_at)
+                values (?, ?, ?, ?)
+                """,
+                (
+                    thread_id,
+                    event_type,
+                    json.dumps(payload, ensure_ascii=False),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def _send_events(self, request: BaseHTTPRequestHandler, thread_id: str) -> None:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                select type, payload, created_at
+                from events
+                where thread_id = ?
+                order by id
+                """,
+                (thread_id,),
+            ).fetchall()
+        body = "".join(
+            f"event: {event_type}\ndata: {payload}\n\n" for event_type, payload, _created_at in rows
