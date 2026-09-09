@@ -203,4 +203,31 @@ class RuntimeApiServer:
                 (thread_id,),
             ).fetchall()
         body = "".join(
-            f"event: {event_type}\ndata: {payload}\n\n" for event_type, payload, _created_at in rows
+            f"event: {event_type}\ndata: {payload}\n\n" for event_type, payload, _created_at in rows
+        ).encode("utf-8")
+        request.send_response(200)
+        request.send_header("content-type", "text/event-stream")
+        request.send_header("content-length", str(len(body)))
+        request.end_headers()
+        request.wfile.write(body)
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                create table if not exists threads (
+                    id text primary key,
+                    created_at text not null
+                )
+                """
+            )
+            conn.execute(
+                """
+                create table if not exists events (
+                    id integer primary key autoincrement,
+                    thread_id text not null,
+                    type text not null,
+                    payload text not null,
+                    created_at text not null
+                )
+                """
