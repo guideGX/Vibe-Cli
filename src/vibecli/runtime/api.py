@@ -109,4 +109,30 @@ class RuntimeApiServer:
             else:
                 _send_json(request, 404, {"error": "not found"})
         except Exception as exc:  # noqa: BLE001 - API boundary
-            _send_json(request, 500, {"error": str(exc)})
+            _send_json(request, 500, {"error": str(exc)})
+
+    async def _run_turn(self, thread_id: str, message: str) -> dict[str, Any]:
+        self._ensure_llm_key()
+        self._append_event(thread_id, "turn.started", {"message": message})
+        registry, _manager = await build_tool_registry(config=self.config, cwd=self.cwd)
+        engine = QueryEngine(
+            llm_client=create_llm_client(self.config.llm),
+            tool_registry=registry,
+            config=self.config,
+            cwd=self.cwd,
+        )
+        text = ""
+        async for event in engine.ask(message):
+            event_type = str(event.get("type"))
+            if event_type == "text_delta":
+                text += str(event.get("text") or "")
+                self._append_event(thread_id, "message.delta", {"text": event.get("text") or ""})
+            elif event_type in {"tool_call", "tool_result", "error", "done"}:
+                self._append_event(thread_id, event_type, _jsonable(event))
+        self._append_event(thread_id, "turn.completed", {"text": text})
+        return {"thread_id": thread_id, "text": text}
+
+    def _worker_loop(self) -> None:
+        while not self._stop.is_set():
+            task = self.task_manager.claim_next()
+            if not task:
