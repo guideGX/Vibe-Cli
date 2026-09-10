@@ -26,4 +26,7 @@ def test_read_write_file_tool(tmp_path, monkeypatch):
         read_result = await read.execute({"path": "hello.txt"}, context)
         return write_result, read_result
 
-    write_result, read_result = asyncio.run(run())
+    write_result, read_result = asyncio.run(run())
+    assert not write_result.is_error
+    assert "1: hello" in read_result.content
+    assert "2: world" in read_result.content
