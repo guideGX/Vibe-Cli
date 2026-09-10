@@ -27,4 +27,24 @@ def _parse_duckduckgo(raw_html: str) -> list[SearchResult]:
     results: list[SearchResult] = []
     pattern = re.compile(
         r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)</a>'
-        r"[\s\S]*?"
+        r"[\s\S]*?"
+        r'<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)</a>',
+        re.I,
+    )
+    for match in pattern.finditer(raw_html):
+        results.append(
+            SearchResult(
+                title=_clean(match.group(2)),
+                url=_normalize_duckduckgo_url(html.unescape(match.group(1))),
+                snippet=_clean(match.group(3)),
+            )
+        )
+    return results
+
+
+def _clean(value: str) -> str:
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", value))).strip()
+
+
+def _normalize_duckduckgo_url(url: str) -> str:
+    parsed = urlparse(url)
