@@ -37,4 +37,45 @@ def test_orchestrator_runs_independent_workers_in_parallel(tmp_path, monkeypatch
 
     async def run():
         text = ""
-        async for event in orchestrator.run("并行完成 A 和 B"):
+        async for event in orchestrator.run("并行完成 A 和 B"):
+            if event.get("type") == "text_delta":
+                text += str(event.get("text") or "")
+            elif event.get("type") == "error":
+                raise event["error"]
+        return text
+
+    result = asyncio.run(run())
+
+    assert "Multi-Agent task completed" in result
+    assert "Task A result" in result
+    assert "Task B result" in result
+    assert client.peak_concurrency == 2
+
+
+class FakeTeamClient:
+    model_name = "fake-model"
+    provider_name = "fake-provider"
+    max_context_window = 1000
+
+    async def chat(self, messages, tools, *, system_prompt):  # noqa: ARG002
+        yield {"type": "text_delta", "text": "{}"}
+        yield {"type": "message_end", "stop_reason": "end_turn"}
+
+
+class ParallelTeamClient(FakeTeamClient):
+    def __init__(self):
+        self.current_concurrency = 0
+        self.peak_concurrency = 0
+        self.ready = asyncio.Event()
+
+    async def chat(self, messages, tools, *, system_prompt):  # noqa: ARG002
+        body = _message_text(messages[-1].content)
+        if "Original task" in body:
+            yield {"type": "text_delta", "text": '{"approved": true, "issues": []}'}
+            yield {"type": "message_end", "stop_reason": "end_turn"}
+            return
+        if "Create an execution plan" in body:
+            yield {
+                "type": "text_delta",
+                "text": (
+                    '{"summary":"parallel","steps":['
