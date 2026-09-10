@@ -108,4 +108,13 @@ def _orchestrator(tmp_path, client):
     config.policy.hitl_mode = "never"
     return AgentOrchestrator(
         llm_client=client,
-        tool_registry=registry,
+        tool_registry=registry,
+        config=config,
+        cwd=str(tmp_path),
+    )
+
+
+def _message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    return str(content)
