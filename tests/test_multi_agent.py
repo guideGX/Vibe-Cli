@@ -78,4 +78,34 @@ class ParallelTeamClient(FakeTeamClient):
             yield {
                 "type": "text_delta",
                 "text": (
-                    '{"summary":"parallel","steps":['
+                    '{"summary":"parallel","steps":['
+                    '{"id":"a","description":"Task A","type":"ANALYSIS","dependencies":[]},'
+                    '{"id":"b","description":"Task B","type":"ANALYSIS","dependencies":[]}'
+                    "]}"
+                ),
+            }
+            yield {"type": "message_end", "stop_reason": "end_turn"}
+            return
+        if "Task A" in body or "Task B" in body:
+            self.current_concurrency += 1
+            self.peak_concurrency = max(self.peak_concurrency, self.current_concurrency)
+            if self.current_concurrency == 2:
+                self.ready.set()
+            await asyncio.wait_for(self.ready.wait(), timeout=2)
+            self.current_concurrency -= 1
+            text = "Task A result" if "Task A" in body else "Task B result"
+            yield {"type": "text_delta", "text": text}
+            yield {"type": "message_end", "stop_reason": "end_turn"}
+            return
+        yield {"type": "text_delta", "text": "fallback"}
+        yield {"type": "message_end", "stop_reason": "end_turn"}
+
+
+def _orchestrator(tmp_path, client):
+    registry = ToolRegistry()
+    registry.register_all(get_builtin_tools())
+    config = load_config(project_root=tmp_path)
+    config.policy.hitl_mode = "never"
+    return AgentOrchestrator(
+        llm_client=client,
+        tool_registry=registry,
