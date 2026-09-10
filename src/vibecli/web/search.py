@@ -47,4 +47,8 @@ def _clean(value: str) -> str:
 
 
 def _normalize_duckduckgo_url(url: str) -> str:
-    parsed = urlparse(url)
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+    if "uddg" in params and params["uddg"]:
+        return unquote(params["uddg"][0])
+    return url
