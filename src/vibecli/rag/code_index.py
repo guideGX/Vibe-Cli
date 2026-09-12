@@ -88,4 +88,30 @@ class CodeIndex:
                 limit 500
                 """,
                 (str(self.root), like),
-            ).fetchall()
+            ).fetchall()
+        results: list[CodeSearchResult] = []
+        for path, line, content in rows:
+            lowered = content.lower()
+            if all(term in lowered for term in terms):
+                results.append(CodeSearchResult(path, int(line), content))
+            if len(results) >= limit:
+                break
+        return results
+
+    def _iter_files(self, base: Path):
+        for path in base.rglob("*"):
+            if any(part in SKIP_DIRS for part in path.parts):
+                continue
+            if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES:
+                yield path
+
+    def _resolve(self, value: str | Path) -> Path:
+        path = Path(value)
+        if not path.is_absolute():
+            path = self.root / path
+        resolved = path.resolve()
+        resolved.relative_to(self.root)
+        return resolved
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as conn:
