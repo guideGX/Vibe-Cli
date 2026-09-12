@@ -27,4 +27,8 @@ class CommandGuard:
     def validate(self, command: str) -> None:
         normalized = " ".join(command.strip().split())
         for blocked in self.blacklist:
-            if blocked and blocked in normalized:
+            if blocked and blocked in normalized:
+                raise CommandPolicyError(f"command rejected by policy: {blocked}")
+        for pattern in self.patterns:
+            if pattern.search(normalized):
+                raise CommandPolicyError("command rejected by destructive-command policy")
