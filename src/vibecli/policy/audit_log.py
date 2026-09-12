@@ -56,4 +56,4 @@ class AuditLog:
             return redacted
         if isinstance(value, list):
             return [self._redact(item) for item in value]
-        return value
+        return value
