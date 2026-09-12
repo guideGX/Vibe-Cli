@@ -114,4 +114,25 @@ class CodeIndex:
         return resolved
 
     def _ensure_schema(self) -> None:
-        with self._connect() as conn:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                create table if not exists code_chunks (
+                    id integer primary key autoincrement,
+                    root text not null,
+                    path text not null,
+                    line integer not null,
+                    content text not null
+                )
+                """
+            )
+            conn.execute(
+                "create index if not exists idx_code_chunks_root_path on code_chunks(root, path)"
+            )
+            conn.execute(
+                "create index if not exists idx_code_chunks_root_content "
+                "on code_chunks(root, content)"
+            )
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
