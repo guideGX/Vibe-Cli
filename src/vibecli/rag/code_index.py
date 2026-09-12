@@ -15,4 +15,23 @@ TEXT_SUFFIXES = {
     ".go",
     ".rs",
     ".md",
-    ".toml",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".xml",
+    ".html",
+    ".css",
+    ".scss",
+    ".sql",
+    ".sh",
+}
+
+SKIP_DIRS = {".git", ".venv", "node_modules", "dist", "build", "target", "__pycache__"}
+
+
+@dataclass(slots=True)
+class CodeSearchResult:
+    path: str
+    line: int
+    snippet: str
