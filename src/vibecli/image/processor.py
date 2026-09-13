@@ -58,4 +58,18 @@ def _resolve_image_path(reference: str, cwd: str) -> Path:
         raise FileNotFoundError(path)
     return path
 
-
+
+def _encode_image(path: Path, max_side: int = 1568) -> tuple[str, int, int]:
+    with Image.open(path) as image:
+        image.thumbnail((max_side, max_side))
+        if image.mode in {"RGBA", "LA"}:
+            background = Image.new("RGB", image.size, "white")
+            background.paste(image, mask=image.getchannel("A"))
+            image = background
+        elif image.mode != "RGB":
+            image = image.convert("RGB")
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=85, optimize=True)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        mime = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+        return f"data:{mime};base64,{encoded}", image.width, image.height
