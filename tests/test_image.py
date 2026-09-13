@@ -26,4 +26,10 @@ def test_non_vision_model_omits_image_payload(tmp_path):
         provider_name="deepseek",
         model="deepseek-v4-flash",
         api_key="key",
-        base_url="https://example.com/v1",
+        base_url="https://example.com/v1",
+    )
+
+    formatted = client._format_content(content)
+
+    assert isinstance(formatted, str)
+    assert "Image omitted" in formatted
