@@ -211,4 +211,44 @@ async def _handle_slash(
         console.print(f"Indexed {count} code lines.")
     elif command == "/search":
         results = CodeIndex(cwd).search(arg, limit=20)
-        output = "\n".join(f"{r.path}:{r.line}: {r.snippet}" for r in results)
+        output = "\n".join(f"{r.path}:{r.line}: {r.snippet}" for r in results)
+        console.print(output or "(no matches)")
+    elif command == "/plan":
+        if not arg:
+            console.print("[red]Usage:[/red] /plan <task>")
+        else:
+            plan_agent = PlanExecuteAgent(
+                llm_client=agent.llm_client,
+                tool_registry=registry,
+                config=config,
+                cwd=cwd,
+                approval_callback=agent.approval_callback,
+            )
+            await _run_events(
+                plan_agent.run(arg),
+                RichRenderer(),
+                agent.llm_client.max_context_window,
+            )
+    elif command == "/team":
+        if not arg:
+            console.print("[red]Usage:[/red] /team <task>")
+        else:
+            orchestrator = AgentOrchestrator(
+                llm_client=agent.llm_client,
+                tool_registry=registry,
+                config=config,
+                cwd=cwd,
+                approval_callback=agent.approval_callback,
+            )
+            await _run_events(
+                orchestrator.run(arg),
+                RichRenderer(),
+                agent.llm_client.max_context_window,
+            )
+    elif command == "/model":
+        _model_command(arg, console, config)
+    elif command == "/skill":
+        _skill_command(arg, console, cwd)
+    elif command == "/mcp":
+        console.print("Use `vibecli mcp serve --transport stdio|http --port 3000` to expose tools.")
+    elif command == "/task":
