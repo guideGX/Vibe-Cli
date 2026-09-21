@@ -178,4 +178,37 @@ async def _handle_slash(
         table = Table(title="VibeCLI Context")
         table.add_column("Field")
         table.add_column("Value")
-        table.add_row("cwd", cwd)
+        table.add_row("cwd", cwd)
+        table.add_row("model", f"{config.llm.model} ({config.llm.provider})")
+        table.add_row("context window", str(agent.llm_client.max_context_window))
+        table.add_row("render", config.render_mode)
+        table.add_row("memory", f"{len(memories)} recent entries")
+        table.add_row("tools", str(len(registry.list_names())))
+        console.print(table)
+    elif command == "/memory":
+        await _memory_command(arg, console, cwd, config)
+    elif command == "/save":
+        if not arg:
+            console.print("[red]Usage:[/red] /save <fact>")
+        else:
+            memory_id = MemoryManager(config.memory.long_term_db_path, scope=cwd).save(arg)
+            console.print(f"Saved memory #{memory_id}")
+    elif command == "/config":
+        console.print_json(json.dumps(config_to_public_dict(config), ensure_ascii=False))
+    elif command == "/tools":
+        console.print("\n".join(registry.list_names()))
+    elif command == "/hitl":
+        _hitl_command(arg, console, config)
+    elif command == "/policy":
+        console.print_json(json.dumps(config_to_public_dict(config)["policy"], ensure_ascii=False))
+    elif command == "/audit":
+        limit = int(arg or "20") if (arg or "20").isdigit() else 20
+        console.print_json(
+            json.dumps(AuditLog(config.policy.audit_log_path).tail(limit), ensure_ascii=False)
+        )
+    elif command == "/index":
+        count = CodeIndex(cwd).rebuild(arg or ".")
+        console.print(f"Indexed {count} code lines.")
+    elif command == "/search":
+        results = CodeIndex(cwd).search(arg, limit=20)
+        output = "\n".join(f"{r.path}:{r.line}: {r.snippet}" for r in results)
