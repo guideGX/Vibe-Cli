@@ -149,4 +149,33 @@ async def _run_events(events, renderer: RichRenderer, context_window: int | None
     renderer.set_context_window(context_window)
     renderer.start_run()
     renderer.newline()
-    async for event in events:
+    async for event in events:
+        renderer.handle(event)
+        if event.get("type") == "error":
+            break
+    renderer.newline()
+
+
+async def _handle_slash(
+    raw: str,
+    console: Console,
+    cwd: str,
+    config: VibeCliConfig,
+    agent: Agent,
+    registry: ToolRegistry,
+) -> bool:
+    command, _, rest = raw.partition(" ")
+    arg = rest.strip()
+    if command in {"/exit", "/quit"}:
+        return True
+    if command == "/help":
+        console.print("\n".join(SLASH_COMMANDS))
+    elif command == "/clear":
+        agent.clear_history()
+        console.clear()
+    elif command == "/context":
+        memories = MemoryManager(config.memory.long_term_db_path, scope=cwd).list(limit=5)
+        table = Table(title="VibeCLI Context")
+        table.add_column("Field")
+        table.add_column("Value")
+        table.add_row("cwd", cwd)
