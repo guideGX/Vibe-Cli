@@ -251,4 +251,48 @@ async def _handle_slash(
         _skill_command(arg, console, cwd)
     elif command == "/mcp":
         console.print("Use `vibecli mcp serve --transport stdio|http --port 3000` to expose tools.")
-    elif command == "/task":
+    elif command == "/task":
+        _task_command(arg, console)
+    elif command == "/snapshot":
+        _snapshot_command(arg, console, cwd)
+    elif command == "/restore":
+        if not arg:
+            console.print("[red]Usage:[/red] /restore <snapshot-id-or-index>")
+        else:
+            record = SnapshotService(cwd).restore(arg)
+            console.print(f"Restored {record.id}")
+    else:
+        console.print(f"[red]Unknown command:[/red] {command}")
+    return False
+
+
+async def _memory_command(arg: str, console: Console, cwd: str, config: VibeCliConfig) -> None:
+    manager = MemoryManager(config.memory.long_term_db_path, scope=cwd)
+    sub, _, rest = arg.partition(" ")
+    if sub == "clear":
+        count = manager.clear()
+        console.print(f"Cleared {count} memories.")
+    elif sub == "search":
+        rows = manager.search(rest)
+        console.print("\n".join(f"#{row.id} {row.content}" for row in rows) or "(no matches)")
+    else:
+        rows = manager.list()
+        console.print("\n".join(f"#{row.id} {row.content}" for row in rows) or "(no memories)")
+
+
+def _hitl_command(arg: str, console: Console, config: VibeCliConfig) -> None:
+    if arg in {"always", "auto", "never"}:
+        config.policy.hitl_mode = arg
+    elif arg == "on":
+        config.policy.hitl_mode = "always"
+    elif arg == "off":
+        config.policy.hitl_mode = "never"
+    console.print(f"HITL mode: {config.policy.hitl_mode}")
+
+
+def _model_command(arg: str, console: Console, config: VibeCliConfig) -> None:
+    if not arg:
+        console.print(f"{config.llm.model} ({config.llm.provider})")
+        return
+    parts = arg.split()
+    if len(parts) == 1:
