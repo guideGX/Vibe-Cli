@@ -324,4 +324,25 @@ def _skill_command(arg: str, console: Console, cwd: str) -> None:
     if sub == "reload":
         registry.reload()
         console.print("skills reloaded")
-        return
+        return
+    rows = registry.all_skills()
+    lines = [
+        f"{item.name}\t{item.source}\t{'on' if item.enabled else 'off'}\t{item.description}"
+        for item in rows
+    ]
+    console.print("\n".join(lines) or "(no skills)")
+
+
+def _task_command(arg: str, console: Console) -> None:
+    manager = DurableTaskManager(Path.home() / ".vibecli" / "tasks" / "tasks.db")
+    sub, _, rest = arg.partition(" ")
+    if sub == "add" and rest:
+        task_id = manager.add(rest)
+        console.print(f"Queued {task_id}")
+    elif sub == "cancel" and rest:
+        console.print(f"Canceled: {manager.cancel(rest.strip())}")
+    elif sub == "log" and rest:
+        task = manager.get(rest.strip())
+        if not task:
+            console.print("(task not found)")
+        else:
