@@ -30,4 +30,44 @@ from vibecli.snapshot import SnapshotService
 from vibecli.tools import ToolRegistry
 
 SLASH_COMMANDS = [
-    "/help",
+    "/help",
+    "/exit",
+    "/clear",
+    "/context",
+    "/memory",
+    "/save",
+    "/config",
+    "/tools",
+    "/hitl",
+    "/policy",
+    "/audit",
+    "/index",
+    "/search",
+    "/plan",
+    "/team",
+    "/model",
+    "/skill",
+    "/mcp",
+    "/task",
+    "/snapshot",
+    "/restore",
+]
+
+
+async def start_repl(cwd: str, config: VibeCliConfig) -> None:
+    console = Console()
+    registry, mcp_manager = await build_tool_registry(config=config, cwd=cwd)
+    client = create_llm_client(config.llm)
+    system_prompt = PromptAssembler(
+        config=config,
+        cwd=cwd,
+        tool_names=registry.list_names(),
+        model=client.model_name,
+        provider=client.provider_name,
+    ).build()
+    tool_count = len(registry.list_names())
+    mcp_server_count = _count_mcp_servers(mcp_manager)
+    skill_count = len(SkillRegistry(cwd).list())
+    agents_file_count = _count_named_files(cwd, "AGENTS.md")
+    renderer = RichRenderer(context_window=client.max_context_window)
+    renderer.banner(
