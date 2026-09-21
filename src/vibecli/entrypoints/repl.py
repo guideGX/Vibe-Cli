@@ -345,4 +345,35 @@ def _task_command(arg: str, console: Console) -> None:
         task = manager.get(rest.strip())
         if not task:
             console.print("(task not found)")
-        else:
+        else:
+            console.print(task.result or task.error or f"Task {task.id} is {task.status}")
+    else:
+        rows = manager.list(limit=20)
+        console.print(
+            "\n".join(f"{task.id} {task.status} {task.prompt[:80]}" for task in rows)
+            or "(no tasks)"
+        )
+
+
+def _snapshot_command(arg: str, console: Console, cwd: str) -> None:
+    service = SnapshotService(cwd)
+    if arg == "clean":
+        console.print(f"Cleaned {service.clean()} snapshots.")
+        return
+    rows = service.list(limit=20)
+    output = "\n".join(
+        f"{index}. {row.id} {row.phase} {row.created_at}" for index, row in enumerate(rows, 1)
+    )
+    console.print(output or "(no snapshots)")
+
+
+def _approval_prompt(request: dict[str, Any], console: Console, config: VibeCliConfig) -> str:
+    if not sys.stdin.isatty():
+        return "deny"
+    console.print(
+        f"[yellow]Approval required[/yellow] {request['tool_name']} "
+        f"({request['danger_level']})\n{request['input']}"
+    )
+    answer = Prompt.ask("Approve?", choices=["y", "n", "a", "s"], default="n")
+    if answer == "a":
+        config.policy.hitl_mode = "never"
