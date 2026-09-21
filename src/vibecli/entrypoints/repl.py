@@ -295,4 +295,33 @@ def _model_command(arg: str, console: Console, config: VibeCliConfig) -> None:
         console.print(f"{config.llm.model} ({config.llm.provider})")
         return
     parts = arg.split()
-    if len(parts) == 1:
+    if len(parts) == 1:
+        config.llm.model = parts[0]
+    else:
+        config.llm.provider = parts[0]
+        config.llm.model = parts[1]
+    console.print(
+        "Model updated for newly created clients. Restart REPL to rebuild the active client."
+    )
+
+
+def _skill_command(arg: str, console: Console, cwd: str) -> None:
+    registry = SkillRegistry(cwd)
+    sub, _, rest = arg.partition(" ")
+    if sub == "show" and rest:
+        skill = registry.load(rest.strip())
+        if not skill:
+            console.print(f'Skill "{rest.strip()}" not found.')
+            return
+        console.print(skill.content[:12_000])
+        return
+    if sub == "on" and rest:
+        console.print("enabled" if registry.enable(rest.strip()) else "skill not found")
+        return
+    if sub == "off" and rest:
+        console.print("disabled" if registry.disable(rest.strip()) else "skill not found")
+        return
+    if sub == "reload":
+        registry.reload()
+        console.print("skills reloaded")
+        return
