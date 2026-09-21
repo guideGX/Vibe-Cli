@@ -89,4 +89,30 @@ async def start_repl(cwd: str, config: VibeCliConfig) -> None:
         cwd=cwd,
         config=config,
         approval_callback=lambda request: _approval_prompt(request, console, config),
-    )
+    )
+
+    history_path = Path.home() / ".vibecli" / "history" / "prompt_history.txt"
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    session = PromptSession(
+        message=lambda: _prompt_message(
+            cwd=cwd,
+            model=client.model_name,
+            tools=tool_count,
+            agents_files=agents_file_count,
+            mcp_servers=mcp_server_count,
+            skills=skill_count,
+            stats=renderer.toolbar_status(),
+        ),
+        history=FileHistory(str(history_path)),
+        completer=WordCompleter(SLASH_COMMANDS, ignore_case=True),
+        placeholder=[("class:placeholder", "Type your message or @path/to/file")],
+        style=Style.from_dict(
+            {
+                "prompt": "bold #ffffff bg:#262626",
+                "placeholder": "#9a9a9a bg:#262626",
+                "prompt.dim": "#a3a3a3 bg:#000000",
+                "prompt.count.agents": "bold #22d3ee bg:#000000",
+                "prompt.count.mcp": "bold #c084fc bg:#000000",
+                "prompt.count.skills": "bold #facc15 bg:#000000",
+                "prompt.tools": "bold #22d3ee bg:#000000",
+                "toolbar.model": "noreverse bold #ffffff bg:#000000",
