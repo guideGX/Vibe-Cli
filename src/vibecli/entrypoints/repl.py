@@ -115,4 +115,38 @@ async def start_repl(cwd: str, config: VibeCliConfig) -> None:
                 "prompt.count.mcp": "bold #c084fc bg:#000000",
                 "prompt.count.skills": "bold #facc15 bg:#000000",
                 "prompt.tools": "bold #22d3ee bg:#000000",
-                "toolbar.model": "noreverse bold #ffffff bg:#000000",
+                "toolbar.model": "noreverse bold #ffffff bg:#000000",
+                "toolbar.ctx.bar": "noreverse #22c55e bg:#000000",
+                "toolbar.ctx.value": "noreverse #ffffff bg:#000000",
+                "toolbar.cwd.value": "noreverse #c084fc bg:#000000",
+                "toolbar.gap": "noreverse #ffffff bg:#000000",
+            }
+        ),
+    )
+
+    while True:
+        try:
+            user_input = await session.prompt_async()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return
+        message = user_input.strip()
+        if not message:
+            continue
+        if message.startswith("/"):
+            should_exit = await _handle_slash(message, console, cwd, config, agent, registry)
+            if should_exit:
+                return
+            continue
+        await _run_agent(agent, renderer, message)
+
+
+async def _run_agent(agent: Agent, renderer: RichRenderer, message: str) -> None:
+    await _run_events(agent.run(message), renderer, agent.llm_client.max_context_window)
+
+
+async def _run_events(events, renderer: RichRenderer, context_window: int | None = None) -> None:
+    renderer.set_context_window(context_window)
+    renderer.start_run()
+    renderer.newline()
+    async for event in events:
