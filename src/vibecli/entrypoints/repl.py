@@ -70,4 +70,23 @@ async def start_repl(cwd: str, config: VibeCliConfig) -> None:
     skill_count = len(SkillRegistry(cwd).list())
     agents_file_count = _count_named_files(cwd, "AGENTS.md")
     renderer = RichRenderer(context_window=client.max_context_window)
-    renderer.banner(
+    renderer.banner(
+        model=client.model_name,
+        provider=client.provider_name,
+        cwd=cwd,
+        tools=tool_count,
+        version=__version__,
+        api_key_configured=bool(config.llm.api_key),
+        mcp_servers=mcp_server_count,
+        skills=skill_count,
+        agents_files=agents_file_count,
+        hitl_mode=config.policy.hitl_mode,
+    )
+    agent = Agent(
+        llm_client=client,
+        tool_registry=registry,
+        system_prompt=system_prompt,
+        cwd=cwd,
+        config=config,
+        approval_callback=lambda request: _approval_prompt(request, console, config),
+    )
