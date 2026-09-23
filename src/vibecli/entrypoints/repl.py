@@ -376,4 +376,38 @@ def _approval_prompt(request: dict[str, Any], console: Console, config: VibeCliC
     )
     answer = Prompt.ask("Approve?", choices=["y", "n", "a", "s"], default="n")
     if answer == "a":
-        config.policy.hitl_mode = "never"
+        config.policy.hitl_mode = "never"
+        return "approve"
+    if answer == "y":
+        return "approve"
+    if answer == "s":
+        return "skip"
+    return "deny"
+
+
+def _count_mcp_servers(manager: Any) -> int:
+    if manager is None:
+        return 0
+    return sum(1 for spec in manager.specs.values() if spec.enabled)
+
+
+def _count_named_files(root: str, filename: str) -> int:
+    excluded_dirs = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+    }
+    count = 0
+    for _dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in excluded_dirs]
+        if filename in filenames:
+            count += 1
+    return count
+
+
