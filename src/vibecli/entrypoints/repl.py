@@ -410,4 +410,35 @@ def _count_named_files(root: str, filename: str) -> int:
             count += 1
     return count
 
-
+
+def _prompt_message(
+    *,
+    cwd: str,
+    model: str,
+    tools: int,
+    agents_files: int,
+    mcp_servers: int,
+    skills: int,
+    stats: dict[str, Any] | None = None,
+) -> list[tuple[str, str]]:
+    return [
+        ("class:prompt.count.agents", str(agents_files)),
+        ("class:prompt.dim", f" {_plural_label(agents_files, 'AGENTS.md file')} · "),
+        ("class:prompt.count.mcp", str(mcp_servers)),
+        ("class:prompt.dim", f" {_plural_label(mcp_servers, 'MCP server')} · "),
+        ("class:prompt.count.skills", str(skills)),
+        ("class:prompt.dim", f" {_plural_label(skills, 'skill')} · Tools "),
+        ("class:prompt.tools", str(tools)),
+        ("class:prompt.dim", "\n"),
+        *_bottom_toolbar(cwd, model, stats),
+        ("class:prompt.dim", "\n\n"),
+        ("class:prompt", "* "),
+    ]
+
+
+def _bottom_toolbar(
+    cwd: str,
+    model: str,
+    stats: dict[str, Any] | None = None,
+) -> list[tuple[str, str]]:
+    stats = stats or {}
