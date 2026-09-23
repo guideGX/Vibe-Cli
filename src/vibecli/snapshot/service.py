@@ -41,4 +41,49 @@ class SnapshotService:
             handle.write(
                 json.dumps(
                     {
-                        "id": record.id,
+                        "id": record.id,
+                        "phase": record.phase,
+                        "created_at": record.created_at,
+                        "path": str(record.path),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+        return record
+
+    def list(self, limit: int = 20) -> list[SnapshotRecord]:
+        if not self.index_path.exists():
+            return []
+        records = []
+        for line in self.index_path.read_text(encoding="utf-8").splitlines():
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            records.append(
+                SnapshotRecord(
+                    id=item["id"],
+                    phase=item["phase"],
+                    created_at=item["created_at"],
+                    path=Path(item["path"]),
+                )
+            )
+        return records[-limit:][::-1]
+
+    def restore(self, snapshot_ref: str) -> SnapshotRecord:
+        records = self.list(limit=200)
+        record = None
+        if snapshot_ref.isdigit():
+            index = int(snapshot_ref) - 1
+            if 0 <= index < len(records):
+                record = records[index]
+        else:
+            record = next((item for item in records if item.id == snapshot_ref), None)
+        if not record:
+            raise ValueError(f"snapshot not found: {snapshot_ref}")
+        self.create("pre-restore")
+        self._restore_tree(record.path, self.project_root)
+        return record
+
+    def clean(self) -> int:
