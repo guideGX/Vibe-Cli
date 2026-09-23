@@ -74,4 +74,43 @@ def test_plan_execute_runs_independent_tasks_in_parallel(tmp_path, monkeypatch):
 
     result = asyncio.run(run())
 
-    assert "Completed [task_1]" in result
+    assert "Completed [task_1]" in result
+    assert "Completed [task_2]" in result
+    assert client.peak_concurrency == 2
+
+
+class FakeClient:
+    model_name = "fake-model"
+    provider_name = "fake-provider"
+    max_context_window = 1000
+
+    async def chat(self, messages, tools, *, system_prompt):  # noqa: ARG002
+        yield {"type": "text_delta", "text": "{}"}
+        yield {"type": "message_end", "stop_reason": "end_turn"}
+
+
+class ParallelPlanClient(FakeClient):
+    def __init__(self):
+        self.current_concurrency = 0
+        self.peak_concurrency = 0
+        self.ready = asyncio.Event()
+
+    async def chat(self, messages, tools, *, system_prompt):  # noqa: ARG002
+        body = _message_text(messages[-1].content)
+        if "Please create an execution plan" in body:
+            yield {
+                "type": "text_delta",
+                "text": (
+                    '{"summary":"parallel","tasks":['
+                    '{"id":"a","description":"Task A","type":"ANALYSIS","dependencies":[]},'
+                    '{"id":"b","description":"Task B","type":"ANALYSIS","dependencies":[]}'
+                    "]}"
+                ),
+            }
+            yield {"type": "message_end", "stop_reason": "end_turn"}
+            return
+
+        if "Task A" in body or "Task B" in body:
+            self.current_concurrency += 1
+            self.peak_concurrency = max(self.peak_concurrency, self.current_concurrency)
+            if self.current_concurrency == 2:
