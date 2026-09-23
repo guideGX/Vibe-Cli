@@ -86,4 +86,38 @@ class SnapshotService:
         self._restore_tree(record.path, self.project_root)
         return record
 
-    def clean(self) -> int:
+    def clean(self) -> int:
+        count = len(self.list(limit=10_000))
+        if self.root.exists():
+            shutil.rmtree(self.root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        return count
+
+    def _copy_tree(self, source: Path, target: Path) -> None:
+        for item in source.iterdir():
+            if _skip(item):
+                continue
+            destination = target / item.name
+            if item.is_dir():
+                shutil.copytree(item, destination, ignore=_ignore)
+            elif item.is_file():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, destination)
+
+    def _restore_tree(self, source: Path, target: Path) -> None:
+        for item in target.iterdir():
+            if _skip(item):
+                continue
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+        self._copy_tree(source, target)
+
+
+def _skip(path: Path) -> bool:
+    return path.name in SKIP_DIRS
+
+
+def _ignore(_directory: str, names: list[str]) -> set[str]:
+    return {name for name in names if name in SKIP_DIRS}
