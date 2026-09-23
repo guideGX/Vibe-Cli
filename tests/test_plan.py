@@ -40,4 +40,38 @@ def test_planner_parses_tasks_and_dependencies():
             {"id": "b", "description": "B", "type": "VERIFICATION", "dependencies": ["a"]}
           ]
         }
-        ```
+        ```
+        """,
+    )
+
+    assert plan.summary == "demo plan"
+    assert plan.get_task("task_2").dependencies == ["task_1"]
+    assert plan.get_task("task_2").type == TaskType.VERIFICATION
+
+
+def test_plan_execute_runs_independent_tasks_in_parallel(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    client = ParallelPlanClient()
+    registry = ToolRegistry()
+    registry.register_all(get_builtin_tools())
+    config = load_config(project_root=tmp_path)
+    config.policy.hitl_mode = "never"
+    agent = PlanExecuteAgent(
+        llm_client=client,
+        tool_registry=registry,
+        config=config,
+        cwd=str(tmp_path),
+    )
+
+    async def run():
+        text = ""
+        async for event in agent.run("先做 A 和 B，然后汇总"):
+            if event.get("type") == "text_delta":
+                text += str(event.get("text") or "")
+            elif event.get("type") == "error":
+                raise event["error"]
+        return text
+
+    result = asyncio.run(run())
+
+    assert "Completed [task_1]" in result
