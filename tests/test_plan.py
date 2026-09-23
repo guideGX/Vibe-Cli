@@ -113,4 +113,20 @@ class ParallelPlanClient(FakeClient):
         if "Task A" in body or "Task B" in body:
             self.current_concurrency += 1
             self.peak_concurrency = max(self.peak_concurrency, self.current_concurrency)
-            if self.current_concurrency == 2:
+            if self.current_concurrency == 2:
+                self.ready.set()
+            await asyncio.wait_for(self.ready.wait(), timeout=2)
+            self.current_concurrency -= 1
+            text = "result for A" if "Task A" in body else "result for B"
+            yield {"type": "text_delta", "text": text}
+            yield {"type": "message_end", "stop_reason": "end_turn"}
+            return
+
+        yield {"type": "text_delta", "text": "fallback"}
+        yield {"type": "message_end", "stop_reason": "end_turn"}
+
+
+def _message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    return str(content)
