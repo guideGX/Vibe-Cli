@@ -464,4 +464,23 @@ def _shorten_home(path: str) -> str:
     home = str(Path.home())
     if path == home:
         return "~"
-    prefix = home + os.sep
+    prefix = home + os.sep
+    if path.startswith(prefix):
+        return "~/" + path[len(prefix) :]
+    return path
+
+
+def _format_toolbar_bar(value: float, *, width: int = 12) -> str:
+    bounded = max(0.0, min(value, 1.0))
+    filled = round(bounded * width)
+    if bounded > 0 and filled == 0:
+        filled = 1
+    return "█" * filled + "░" * (width - filled)
+
+
+def _format_toolbar_percent(value: float) -> str:
+    if value <= 0:
+        return "0%"
+    if value < 0.01:
+        return "<1%"
+    return f"{value:.0%}"
