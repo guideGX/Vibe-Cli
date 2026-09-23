@@ -14,4 +14,5 @@ def test_path_guard_rejects_escape(tmp_path):
 
 
 def test_command_guard_rejects_destructive_command():
-    with pytest.raises(CommandPolicyError):
+    with pytest.raises(CommandPolicyError):
+        CommandGuard().validate("rm -rf /")
