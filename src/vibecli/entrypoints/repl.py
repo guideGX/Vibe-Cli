@@ -441,4 +441,27 @@ def _bottom_toolbar(
     model: str,
     stats: dict[str, Any] | None = None,
 ) -> list[tuple[str, str]]:
-    stats = stats or {}
+    stats = stats or {}
+    has_usage = bool(stats.get("has_usage"))
+    context_ratio = float(stats.get("context_ratio") or 0)
+    context_text = _format_toolbar_percent(context_ratio) if has_usage else "0%"
+    return [
+        ("class:toolbar.model", model),
+        ("class:toolbar.gap", "    "),
+        ("class:toolbar.ctx.bar", _format_toolbar_bar(context_ratio if has_usage else 0)),
+        ("class:toolbar.gap", " "),
+        ("class:toolbar.ctx.value", context_text),
+        ("class:toolbar.gap", "  "),
+        ("class:toolbar.cwd.value", _shorten_home(cwd)),
+    ]
+
+
+def _plural_label(count: int, singular: str) -> str:
+    return singular if count == 1 else singular + "s"
+
+
+def _shorten_home(path: str) -> str:
+    home = str(Path.home())
+    if path == home:
+        return "~"
+    prefix = home + os.sep
