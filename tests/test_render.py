@@ -98,4 +98,45 @@ def test_text_deltas_render_as_markdown_on_turn_complete():
 
     stats = renderer.toolbar_status()
     assert stats["turns"] == 1
-    assert stats["input_tokens"] == 250
+    assert stats["input_tokens"] == 250
+    assert stats["output_tokens"] == 50
+    assert stats["total_tokens"] == 300
+    assert stats["context_ratio"] == 0.25
+    assert stats["has_usage"] is True
+
+
+def test_interleaved_thinking_does_not_repeat_assistant_output_panels():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120)
+    renderer = RichRenderer(console=console)
+
+    renderer.handle({"type": "text_delta", "text": "第一段"})
+    renderer.handle({"type": "thinking_delta", "thinking": "中途补充思考"})
+    renderer.handle({"type": "text_delta", "text": "第二段"})
+    renderer.handle({"type": "turn_complete"})
+
+    output = stream.getvalue()
+    assert output.count("Assistant Output") == 0
+    assert output.count("Final Output") == 1
+    assert output.count("Thinking") == 1
+    assert "第一段第二段" in output
+
+
+def test_streaming_text_waits_for_turn_boundary_by_default():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120, force_terminal=True)
+    renderer = RichRenderer(console=console)
+
+    renderer.handle({"type": "text_delta", "text": "chunk 1"})
+    renderer.handle({"type": "text_delta", "text": "chunk 2"})
+
+    assert "Assistant Output" not in stream.getvalue()
+    renderer.handle({"type": "turn_complete"})
+    assert stream.getvalue().count("Final Output") == 1
+
+
+def test_tool_use_and_result_render_as_structured_panels():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120)
+    renderer = RichRenderer(console=console)
+
