@@ -21,4 +21,25 @@ def test_banner_renders_pi_home_layout():
         version="0.1.0",
         api_key_configured=True,
         mcp_servers=1,
-        skills=3,
+        skills=3,
+        agents_files=2,
+        hitl_mode="never",
+    )
+
+    output = stream.getvalue()
+    assert "████████████" in output
+    assert "  ██    ██" in output
+    assert "VibeCLI v0.1.0" in output
+    assert "Signed in API Key" in output
+    assert "What's new (v0.1.0)" in output
+
+
+def test_prompt_message_keeps_status_and_input_together():
+    prompt = _prompt_message(
+        cwd="/tmp/project",
+        model="deepseek-v4-flash",
+        tools=12,
+        agents_files=2,
+        mcp_servers=1,
+        skills=3,
+        stats={"total_tokens": 13187, "context_ratio": 0.013, "has_usage": True},
