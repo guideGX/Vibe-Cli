@@ -139,4 +139,38 @@ def test_tool_use_and_result_render_as_structured_panels():
     stream = StringIO()
     console = Console(file=stream, color_system=None, width=120)
     renderer = RichRenderer(console=console)
-
+
+    renderer.handle({"type": "tool_call", "name": "list_dir", "input": {"path": "."}})
+    renderer.handle(
+        {
+            "type": "tool_result",
+            "name": "list_dir",
+            "result": "README.md\nsrc/",
+            "is_error": False,
+        }
+    )
+
+    output = stream.getvalue()
+    assert "Tool Use" in output
+    assert "list_dir" in output
+    assert '"path": "."' in output
+    assert "Tool Result · list_dir · ok" in output
+    assert "README.md" in output
+
+
+def test_start_run_resets_token_usage():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120)
+    renderer = RichRenderer(console=console, context_window=1000)
+
+    renderer.handle({"type": "usage", "usage": {"input_tokens": 900, "output_tokens": 10}})
+    renderer.start_run()
+    renderer.handle({"type": "usage", "usage": {"input_tokens": 100, "output_tokens": 20}})
+    renderer.handle({"type": "done", "total_turns": 1, "total_tokens": 120})
+
+    assert "900" not in stream.getvalue()
+    stats = renderer.toolbar_status()
+    assert stats["input_tokens"] == 100
+    assert stats["output_tokens"] == 20
+    assert stats["total_tokens"] == 120
+    assert stats["context_ratio"] == 0.1
