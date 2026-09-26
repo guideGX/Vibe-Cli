@@ -173,4 +173,18 @@ def test_start_run_resets_token_usage():
     assert stats["input_tokens"] == 100
     assert stats["output_tokens"] == 20
     assert stats["total_tokens"] == 120
-    assert stats["context_ratio"] == 0.1
+    assert stats["context_ratio"] == 0.1
+
+
+def test_missing_usage_keeps_toolbar_tokens_unavailable():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120)
+    renderer = RichRenderer(console=console, context_window=1000)
+
+    renderer.handle({"type": "done", "total_turns": 1, "total_tokens": 0})
+
+    assert "Run Summary" not in stream.getvalue()
+    toolbar = _bottom_toolbar("/tmp/project", "deepseek-v4-flash", renderer.toolbar_status())
+    assert ("class:toolbar.model", "deepseek-v4-flash") in toolbar
+    assert ("class:toolbar.ctx.bar", "░░░░░░░░░░░░") in toolbar
+    assert ("class:toolbar.ctx.value", "0%") in toolbar
