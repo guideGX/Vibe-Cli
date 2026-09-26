@@ -67,4 +67,35 @@ def test_bottom_toolbar_uses_runtime_summary_segments():
 
     assert ("class:toolbar.model", "deepseek-v4-flash") in toolbar
     assert ("class:toolbar.ctx.bar", "█░░░░░░░░░░░") in toolbar
-    assert ("class:toolbar.ctx.value", "1%") in toolbar
+    assert ("class:toolbar.ctx.value", "1%") in toolbar
+    assert ("class:toolbar.cwd.value", "/Users/me/project") in toolbar
+    assert not any(text == " TURN " for _style, text in toolbar)
+    assert not any("Token" in text for _style, text in toolbar)
+
+
+def test_text_deltas_render_as_markdown_on_turn_complete():
+    stream = StringIO()
+    console = Console(file=stream, color_system=None, width=120)
+    renderer = RichRenderer(console=console, context_window=1000)
+
+    renderer.handle({"type": "thinking_delta", "thinking": "需要先确认项目结构"})
+    renderer.handle({"type": "text_delta", "text": "你好，我是 **Vibe"})
+    renderer.handle({"type": "text_delta", "text": "CLI**\n\n- `read_file`\n- **网页搜索**"})
+    renderer.handle({"type": "usage", "usage": {"input_tokens": 250, "output_tokens": 50}})
+    renderer.handle({"type": "turn_complete"})
+    renderer.handle({"type": "done", "total_turns": 1, "total_tokens": 300})
+
+    output = stream.getvalue()
+    assert "Thinking" in output
+    assert "需要先确认项目结构" in output
+    assert "Final Output" in output
+    assert "VibeCLI" in output
+    assert "read_file" in output
+    assert "网页搜索" in output
+    assert "Run Summary" not in output
+    assert "**VibeCLI**" not in output
+    assert "`read_file`" not in output
+
+    stats = renderer.toolbar_status()
+    assert stats["turns"] == 1
+    assert stats["input_tokens"] == 250
