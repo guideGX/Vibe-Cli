@@ -56,4 +56,37 @@ class SkillContextBuffer:
 
     def size(self) -> int:
         return len(self._items)
-
+
+
+class SkillStateStore:
+    def __init__(self, path: str | Path | None = None):
+        self.path = Path(path or Path.home() / ".vibecli" / "skills.json").expanduser()
+
+    def disabled(self) -> set[str]:
+        if not self.path.exists():
+            return set()
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return set()
+        values = data.get("disabled") if isinstance(data, dict) else None
+        if not isinstance(values, list):
+            return set()
+        return {str(item) for item in values if str(item).strip()}
+
+    def disable(self, name: str) -> None:
+        values = self.disabled()
+        values.add(name)
+        self._write(values)
+
+    def enable(self, name: str) -> None:
+        values = self.disabled()
+        values.discard(name)
+        self._write(values)
+
+    def _write(self, disabled: set[str]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(
+            json.dumps({"disabled": sorted(disabled)}, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
