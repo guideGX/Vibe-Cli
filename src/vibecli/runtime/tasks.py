@@ -81,4 +81,31 @@ class DurableTaskManager:
                 from tasks
                 order by created_at desc
                 limit ?
-                """,
+                """,
+                (limit,),
+            ).fetchall()
+        return [TaskRecord(*row) for row in rows]
+
+    def get(self, task_id: str) -> TaskRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                select id, prompt, status, created_at, updated_at, result, error
+                from tasks
+                where id = ?
+                """,
+                (task_id,),
+            ).fetchone()
+        return TaskRecord(*row) if row else None
+
+    def _update(
+        self,
+        task_id: str,
+        status: str,
+        *,
+        result: str | None,
+        error: str | None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
