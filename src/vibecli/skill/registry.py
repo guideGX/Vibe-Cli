@@ -89,4 +89,31 @@ class SkillStateStore:
         self.path.write_text(
             json.dumps({"disabled": sorted(disabled)}, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
-        )
+        )
+
+
+class SkillRegistry:
+    """Load SKILL.md files from built-in, user, and project locations."""
+
+    def __init__(
+        self,
+        project_root: str | Path,
+        *,
+        builtin_root: str | Path | None = None,
+        user_root: str | Path | None = None,
+        state_store: SkillStateStore | None = None,
+    ):
+        self.project_root = Path(project_root).resolve()
+        package_root = Path(__file__).resolve().parents[1]
+        self.builtin_root = Path(builtin_root or package_root / "builtin_skills")
+        self.user_root = Path(user_root or Path.home() / ".vibecli" / "skills")
+        self.project_skill_root = self.project_root / ".vibecli" / "skills"
+        self.state_store = state_store or SkillStateStore()
+        self._skills: dict[str, Skill] | None = None
+
+    def reload(self) -> None:
+        self._skills = None
+
+    def list(self) -> list[Skill]:
+        return self.enabled_skills()
+
