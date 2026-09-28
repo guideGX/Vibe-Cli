@@ -209,4 +209,20 @@ def _parse_frontmatter(content: str) -> dict[str, str]:
     if not match:
         return {}
     lines = match.group(1).splitlines()
-    metadata: dict[str, str] = {}
+    metadata: dict[str, str] = {}
+    index = 0
+    while index < len(lines):
+        raw_line = lines[index]
+        if ":" not in raw_line:
+            index += 1
+            continue
+        key, value = raw_line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if value == "|":
+            index += 1
+            block: list[str] = []
+            while index < len(lines) and (lines[index].startswith(" ") or not lines[index].strip()):
+                block.append(lines[index].strip())
+                index += 1
+            metadata[key] = " ".join(part for part in block if part)
