@@ -108,4 +108,38 @@ class DurableTaskManager:
     ) -> None:
         with self._connect() as conn:
             conn.execute(
-                """
+                """
+                update tasks
+                set status = ?, result = ?, error = ?, updated_at = ?
+                where id = ?
+                """,
+                (status, result, error, _now(), task_id),
+            )
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                create table if not exists tasks (
+                    id text primary key,
+                    prompt text not null,
+                    status text not null,
+                    created_at text not null,
+                    updated_at text not null,
+                    result text,
+                    error text
+                )
+                """
+            )
+            conn.execute("create index if not exists idx_tasks_status on tasks(status, created_at)")
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path)
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
