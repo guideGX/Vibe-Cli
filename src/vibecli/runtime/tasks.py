@@ -29,4 +29,26 @@ class DurableTaskManager:
         with self._connect() as conn:
             conn.execute(
                 """
-                insert into tasks(id, prompt, status, created_at, updated_at)
+                insert into tasks(id, prompt, status, created_at, updated_at)
+                values (?, ?, 'queued', ?, ?)
+                """,
+                (task_id, prompt, now, now),
+            )
+        return task_id
+
+    def claim_next(self) -> TaskRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                select id, prompt, status, created_at, updated_at, result, error
+                from tasks
+                where status = 'queued'
+                order by created_at
+                limit 1
+                """
+            ).fetchone()
+            if not row:
+                return None
+            conn.execute(
+                "update tasks set status = 'running', updated_at = ? where id = ?",
+                (_now(), row[0]),
