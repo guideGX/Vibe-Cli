@@ -225,4 +225,21 @@ def _parse_frontmatter(content: str) -> dict[str, str]:
             while index < len(lines) and (lines[index].startswith(" ") or not lines[index].strip()):
                 block.append(lines[index].strip())
                 index += 1
-            metadata[key] = " ".join(part for part in block if part)
+            metadata[key] = " ".join(part for part in block if part)
+            continue
+        metadata[key] = value.strip().strip('"').strip("'")
+        index += 1
+    return metadata
+
+
+def _strip_frontmatter(content: str) -> str:
+    if not content.startswith("---"):
+        return content
+    return re.sub(r"^---\s*\n.*?\n---\s*", "", content, count=1, flags=re.S)
+
+
+def _parse_tags(raw: str) -> list[str]:
+    value = raw.strip()
+    if not value:
+        return []
+    if value.startswith("[") and value.endswith("]"):
