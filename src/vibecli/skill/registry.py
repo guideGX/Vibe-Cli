@@ -138,4 +138,49 @@ class SkillRegistry:
         self.state_store.enable(name)
         self.reload()
         return True
-
+
+    def disable(self, name: str) -> bool:
+        if not self.load(name, include_disabled=True):
+            return False
+        self.state_store.disable(name)
+        self.reload()
+        return True
+
+    def index_text(self, max_chars: int = 4000, max_skills: int = 20) -> str:
+        skills = self.enabled_skills()[:max_skills]
+        if not skills:
+            return ""
+        lines = [
+            "Available skills:",
+            "Load a skill with load_skill(name) when its description matches the task.",
+        ]
+        for skill in skills:
+            description = " ".join(skill.description.split())
+            if len(description) > 500:
+                description = description[:497] + "..."
+            lines.append(f"- {skill.name}: {description}")
+        text = "\n".join(lines)
+        return text[:max_chars]
+
+    def _load_all(self) -> dict[str, Skill]:
+        if self._skills is not None:
+            return self._skills
+        disabled = self.state_store.disabled()
+        skills: dict[str, Skill] = {}
+        for source, root in [
+            ("builtin", self.builtin_root),
+            ("user", self.user_root),
+            ("project", self.project_skill_root),
+        ]:
+            if not root.exists():
+                continue
+            for skill_file in sorted(root.glob("*/SKILL.md")):
+                skill = self._load_skill_file(skill_file, source, disabled)
+                if skill:
+                    skills[skill.name] = skill
+        self._skills = skills
+        return skills
+
+    def _load_skill_file(self, path: Path, source: str, disabled: set[str]) -> Skill | None:
+        try:
+            content = path.read_text(encoding="utf-8")
