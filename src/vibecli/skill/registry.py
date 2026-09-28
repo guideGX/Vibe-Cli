@@ -242,4 +242,6 @@ def _parse_tags(raw: str) -> list[str]:
     value = raw.strip()
     if not value:
         return []
-    if value.startswith("[") and value.endswith("]"):
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    return [item.strip().strip('"').strip("'") for item in value.split(",") if item.strip()]
