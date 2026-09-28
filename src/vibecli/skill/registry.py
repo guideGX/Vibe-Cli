@@ -116,4 +116,26 @@ class SkillRegistry:
 
     def list(self) -> list[Skill]:
         return self.enabled_skills()
+
+    def all_skills(self) -> list[Skill]:
+        skills = self._load_all()
+        return [skills[name] for name in sorted(skills)]
+
+    def enabled_skills(self) -> list[Skill]:
+        return [skill for skill in self.all_skills() if skill.enabled]
+
+    def load(self, name: str, *, include_disabled: bool = False) -> Skill | None:
+        skill = self._load_all().get(name)
+        if not skill:
+            return None
+        if not include_disabled and not skill.enabled:
+            return None
+        return skill
+
+    def enable(self, name: str) -> bool:
+        if not self.load(name, include_disabled=True):
+            return False
+        self.state_store.enable(name)
+        self.reload()
+        return True
 
