@@ -51,4 +51,34 @@ class DurableTaskManager:
                 return None
             conn.execute(
                 "update tasks set status = 'running', updated_at = ? where id = ?",
-                (_now(), row[0]),
+                (_now(), row[0]),
+            )
+        return TaskRecord(*row[:2], "running", row[3], _now(), row[5], row[6])
+
+    def complete(self, task_id: str, result: str) -> None:
+        self._update(task_id, "completed", result=result, error=None)
+
+    def fail(self, task_id: str, error: str) -> None:
+        self._update(task_id, "failed", result=None, error=error)
+
+    def cancel(self, task_id: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                update tasks
+                set status = 'canceled', updated_at = ?
+                where id = ? and status in ('queued', 'running')
+                """,
+                (_now(), task_id),
+            )
+            return cursor.rowcount > 0
+
+    def list(self, limit: int = 50) -> list[TaskRecord]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                select id, prompt, status, created_at, updated_at, result, error
+                from tasks
+                order by created_at desc
+                limit ?
+                """,
