@@ -183,4 +183,30 @@ class SkillRegistry:
 
     def _load_skill_file(self, path: Path, source: str, disabled: set[str]) -> Skill | None:
         try:
-            content = path.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        metadata = _parse_frontmatter(content)
+        name = metadata.get("name") or path.parent.name
+        description = metadata.get("description") or ""
+        tags = _parse_tags(metadata.get("tags", ""))
+        return Skill(
+            name=name,
+            description=description,
+            version=metadata.get("version") or "",
+            tags=tags,
+            source=source,
+            path=path,
+            content=content,
+            enabled=name not in disabled,
+        )
+
+
+def _parse_frontmatter(content: str) -> dict[str, str]:
+    if not content.startswith("---"):
+        return {}
+    match = re.match(r"^---\s*\n(.*?)\n---\s*", content, re.S)
+    if not match:
+        return {}
+    lines = match.group(1).splitlines()
+    metadata: dict[str, str] = {}
