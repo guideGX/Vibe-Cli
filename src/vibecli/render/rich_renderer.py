@@ -225,4 +225,23 @@ class RichRenderer:
         self._input_tokens += input_tokens
         self._output_tokens += output_tokens
         if input_tokens:
-            self._last_input_tokens = input_tokens
+            self._last_input_tokens = input_tokens
+
+    def _print_tool_call(self, event: dict[str, Any]) -> None:
+        name = str(event.get("name") or "unknown")
+        payload = event.get("input") or {}
+        body = Table.grid(padding=(0, 1))
+        body.add_column(style="dim", no_wrap=True)
+        body.add_column()
+        body.add_row("name", Text(name, style="bold #facc15"))
+        body.add_row("input", Text(_format_payload(payload), style="#e5e7eb"))
+        self.console.print(
+            _output_panel(
+                body,
+                title=Text("Tool Use", style="bold #facc15"),
+                border_style="#facc15",
+            )
+        )
+
+    def _print_tool_result(self, event: dict[str, Any]) -> None:
+        is_error = bool(event.get("is_error"))
