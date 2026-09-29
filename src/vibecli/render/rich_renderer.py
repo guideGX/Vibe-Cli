@@ -104,4 +104,22 @@ class RichRenderer:
         elif event_type == "turn_complete":
             stop_reason = str(event.get("stop_reason") or "end_turn")
             title = "Assistant Output" if stop_reason == "tool_use" else "Final Output"
-            self._flush_thinking()
+            self._flush_thinking()
+            self._flush_markdown(title=title)
+        elif event_type == "tool_call":
+            self._flush_thinking()
+            self._flush_markdown(title="Assistant Output")
+            self._print_tool_call(event)
+        elif event_type == "tool_result":
+            self._flush_thinking()
+            self._flush_markdown(title="Assistant Output")
+            self._print_tool_result(event)
+        elif event_type == "error":
+            self._flush_thinking()
+            self._flush_markdown(title="Assistant Output")
+            self.console.print(f"[red]Error:[/red] {event.get('error')}")
+        elif event_type == "done":
+            self._flush_thinking()
+            self._flush_markdown(title="Final Output")
+            self._record_run_summary(event)
+
