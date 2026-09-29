@@ -70,4 +70,38 @@ class RichRenderer:
         mcp_servers: int = 0,
         skills: int = 0,
         agents_files: int = 0,
-        hitl_mode: str = "auto",
+        hitl_mode: str = "auto",
+    ) -> None:
+        top = Table.grid(expand=True)
+        top.add_column(ratio=1)
+        top.add_column(ratio=2)
+        top.add_row(
+            self._identity_panel(version=version, api_key_configured=api_key_configured),
+            self._release_panel(version=version),
+        )
+
+        _ = model, provider, cwd, tools, mcp_servers, skills, agents_files, hitl_mode
+
+        self.console.print()
+        self.console.print(top)
+        self.console.print(Align.right(Text("? for shortcuts", style="dim")))
+        self.console.rule(style="grey23")
+        self.console.print()
+
+    def handle(self, event: dict[str, Any]) -> None:
+        event_type = event.get("type")
+        if event_type == "text_delta":
+            self._flush_thinking()
+            text = str(event.get("text") or "")
+            self._buffer.append(text)
+            self._update_live_markdown()
+        elif event_type == "thinking_delta":
+            thinking = str(event.get("thinking") or "")
+            self._thinking_buffer.append(thinking)
+            self._update_live_thinking()
+        elif event_type == "usage":
+            self._record_usage(event.get("usage") or {})
+        elif event_type == "turn_complete":
+            stop_reason = str(event.get("stop_reason") or "end_turn")
+            title = "Assistant Output" if stop_reason == "tool_use" else "Final Output"
+            self._flush_thinking()
