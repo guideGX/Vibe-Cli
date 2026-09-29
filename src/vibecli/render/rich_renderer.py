@@ -165,4 +165,28 @@ class RichRenderer:
                 transient=True,
                 vertical_overflow="visible",
             )
-            self._live.start(refresh=True)
+            self._live.start(refresh=True)
+            return
+        self._live.update(renderable, refresh=True)
+
+    def _stop_live_markdown(self) -> None:
+        if self._live is None:
+            return
+        self._live.stop()
+        self._live = None
+
+    def _flush_thinking(self) -> None:
+        if not self._thinking_buffer:
+            return
+        text = "".join(self._thinking_buffer)
+        self._thinking_buffer.clear()
+        self._stop_live_thinking()
+        if text.strip():
+            self.console.print(
+                _output_panel(
+                    Text(text, style="dim"),
+                    title=Text("Thinking", style="bold #c084fc"),
+                    border_style="#6d28d9",
+                )
+            )
+
