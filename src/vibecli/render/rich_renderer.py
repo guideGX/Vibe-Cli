@@ -333,4 +333,7 @@ def _output_panel(renderable: Any, *, title: Text, border_style: str) -> Panel:
     return Panel(
         renderable,
         title=title,
-        border_style=border_style,
+        border_style=border_style,
+        box=box.ROUNDED,
+        expand=True,
+    )
