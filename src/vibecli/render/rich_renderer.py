@@ -122,4 +122,47 @@ class RichRenderer:
             self._flush_thinking()
             self._flush_markdown(title="Final Output")
             self._record_run_summary(event)
-
+
+    def markdown(self, text: str) -> None:
+        self.console.print(Markdown(text))
+
+    def newline(self) -> None:
+        self._flush_thinking()
+        self._flush_markdown(title="Final Output")
+        self.console.print()
+
+    def _flush_markdown(self, *, title: str) -> None:
+        if not self._buffer:
+            return
+        text = "".join(self._buffer)
+        self._buffer.clear()
+        self._stop_live_markdown()
+        if text.strip():
+            self.console.print(
+                _output_panel(
+                    Markdown(text),
+                    title=Text(title, style="bold #a8ff60"),
+                    border_style="#3f3f46",
+                )
+            )
+
+    def _update_live_markdown(self) -> None:
+        if not self._live_markdown or not self.console.is_terminal:
+            return
+        text = "".join(self._buffer)
+        if not text.strip():
+            return
+        renderable = _output_panel(
+            Markdown(text),
+            title=Text("Assistant Output", style="bold #a8ff60"),
+            border_style="#3f3f46",
+        )
+        if self._live is None:
+            self._live = Live(
+                renderable,
+                console=self.console,
+                refresh_per_second=12,
+                transient=True,
+                vertical_overflow="visible",
+            )
+            self._live.start(refresh=True)
