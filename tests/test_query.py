@@ -39,4 +39,19 @@ class FakeClient:
 def test_query_engine_executes_tool_and_replays_result(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     (tmp_path / "note.txt").write_text("hello\n", encoding="utf-8")
-    config = load_config(project_root=tmp_path)
+    config = load_config(project_root=tmp_path)
+    registry = ToolRegistry()
+    registry.register_all(get_builtin_tools())
+    engine = QueryEngine(
+        llm_client=FakeClient(),
+        tool_registry=registry,
+        config=config,
+        cwd=str(tmp_path),
+    )
+
+    async def run() -> Any:
+        return await engine.ask_complete_async("read note")
+
+    result = asyncio.run(run())
+    assert result.text == "done"
+    assert result.turns == 2
