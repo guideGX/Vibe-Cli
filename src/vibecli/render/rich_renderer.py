@@ -189,4 +189,40 @@ class RichRenderer:
                     border_style="#6d28d9",
                 )
             )
-
+
+    def _update_live_thinking(self) -> None:
+        if not self._live_markdown or not self.console.is_terminal:
+            return
+        text = "".join(self._thinking_buffer)
+        if not text.strip():
+            return
+        renderable = _output_panel(
+            Text(text, style="dim"),
+            title=Text("Thinking", style="bold #c084fc"),
+            border_style="#6d28d9",
+        )
+        if self._thinking_live is None:
+            self._thinking_live = Live(
+                renderable,
+                console=self.console,
+                refresh_per_second=12,
+                transient=True,
+                vertical_overflow="visible",
+            )
+            self._thinking_live.start(refresh=True)
+            return
+        self._thinking_live.update(renderable, refresh=True)
+
+    def _stop_live_thinking(self) -> None:
+        if self._thinking_live is None:
+            return
+        self._thinking_live.stop()
+        self._thinking_live = None
+
+    def _record_usage(self, usage: dict[str, Any]) -> None:
+        input_tokens = int(usage.get("input_tokens") or 0)
+        output_tokens = int(usage.get("output_tokens") or 0)
+        self._input_tokens += input_tokens
+        self._output_tokens += output_tokens
+        if input_tokens:
+            self._last_input_tokens = input_tokens
