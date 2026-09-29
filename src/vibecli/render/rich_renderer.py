@@ -281,4 +281,26 @@ class RichRenderer:
         if api_key_configured:
             identity.append("Signed in ", style="bold white")
             identity.append("API Key", style="dim")
-        else:
+        else:
+            identity.append("Missing ", style="bold red")
+            identity.append("API Key", style="dim")
+
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column(no_wrap=True)
+        grid.add_column()
+        grid.add_row(logo, Align.center(identity, vertical="middle"))
+        return grid
+
+    def _release_panel(self, *, version: str) -> Panel:
+        notes = Text()
+        for line in [
+            "π logo home layout for the interactive CLI",
+            "MCP, skills, tools, and workspace status at a glance",
+            "Use /help for commands and /config for runtime settings",
+        ]:
+            notes.append("- ", style="dim")
+            notes.append(line, style="dim")
+            notes.append("\n")
+        notes.append("/help", style="purple")
+        notes.append(" for more", style="dim")
+        return Panel(
