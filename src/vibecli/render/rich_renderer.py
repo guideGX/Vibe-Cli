@@ -303,4 +303,34 @@ class RichRenderer:
             notes.append("\n")
         notes.append("/help", style="purple")
         notes.append(" for more", style="dim")
-        return Panel(
+        return Panel(
+            notes,
+            title=Text(f"What's new (v{version})", style="bold green"),
+            border_style="grey37",
+            box=box.ROUNDED,
+            padding=(0, 2),
+        )
+
+
+_PI_LOGO = (
+    "████████████",
+    "  ██    ██  ",
+    "  ██    ██  ",
+    "  ██    ██  ",
+    "  ██    ██  ",
+    "  ██    ██  ",
+)
+
+
+def _format_payload(payload: Any) -> str:
+    try:
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    except TypeError:
+        return str(payload)
+
+
+def _output_panel(renderable: Any, *, title: Text, border_style: str) -> Panel:
+    return Panel(
+        renderable,
+        title=title,
+        border_style=border_style,
