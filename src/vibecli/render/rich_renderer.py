@@ -244,4 +244,41 @@ class RichRenderer:
         )
 
     def _print_tool_result(self, event: dict[str, Any]) -> None:
-        is_error = bool(event.get("is_error"))
+        is_error = bool(event.get("is_error"))
+        name = str(event.get("name") or "unknown")
+        result = str(event.get("result") or "")
+        if len(result) > 1200:
+            result = result[:1200] + "\n... [truncated]"
+        title_style = "bold #ff4d5a" if is_error else "bold #22c55e"
+        border_style = "#ff4d5a" if is_error else "#22c55e"
+        status = "error" if is_error else "ok"
+        self.console.print(
+            _output_panel(
+                result or "(empty result)",
+                title=Text(f"Tool Result · {name} · {status}", style=title_style),
+                border_style=border_style,
+            )
+        )
+
+    def _record_run_summary(self, event: dict[str, Any]) -> None:
+        total_tokens = int(event.get("total_tokens") or self._input_tokens + self._output_tokens)
+        turns = int(event.get("total_turns") or 0)
+        has_usage = total_tokens > 0 or self._input_tokens > 0 or self._output_tokens > 0
+        context_ratio = (
+            self._last_input_tokens / self._context_window if self._context_window > 0 else 0
+        )
+        self._last_turns = turns
+        self._last_total_tokens = total_tokens
+        self._last_context_ratio = context_ratio
+        self._last_has_usage = has_usage
+
+    def _identity_panel(self, *, version: str, api_key_configured: bool) -> Table:
+        logo = Text("\n".join(_PI_LOGO), style="bold #a8ff60")
+        identity = Text()
+        identity.append("VibeCLI ", style="bold white")
+        identity.append(f"v{version}", style="dim")
+        identity.append("\n\n")
+        if api_key_configured:
+            identity.append("Signed in ", style="bold white")
+            identity.append("API Key", style="dim")
+        else:
