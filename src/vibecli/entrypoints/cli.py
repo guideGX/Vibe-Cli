@@ -122,4 +122,39 @@ def runtime_serve(
 def mcp_serve(
     transport: Annotated[
         str,
-        typer.Option("--transport", help="Transport type: stdio or http"),
+        typer.Option("--transport", help="Transport type: stdio or http"),
+    ] = "stdio",
+    port: Annotated[int, typer.Option("--port", help="HTTP port")] = 3000,
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+) -> None:
+    root = str((cwd or Path.cwd()).resolve())
+    if transport == "http":
+        serve_http(port=port, cwd=root)
+    elif transport == "stdio":
+        asyncio.run(serve_stdio(cwd=root))
+    else:
+        raise typer.BadParameter("transport must be stdio or http")
+
+
+@mcp_app.command("init-chrome")
+def mcp_init_chrome(
+    scope: Annotated[
+        str,
+        typer.Option("--scope", help="Config scope: user or project"),
+    ] = "project",
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+    browser_url: Annotated[
+        str | None,
+        typer.Option("--browser-url", help="Connect to an existing Chrome remote debugging URL"),
+    ] = None,
+    headless: Annotated[bool, typer.Option("--headless", help="Start Chrome headless")] = False,
+    slim: Annotated[bool, typer.Option("--slim", help="Use Chrome DevTools slim mode")] = False,
+) -> None:
+    if scope not in {"user", "project"}:
+        raise typer.BadParameter("scope must be user or project")
+    root = None if scope == "user" else (cwd or Path.cwd()).resolve()
+    path = write_chrome_devtools_config(
+        scope_root=root,
+        browser_url=browser_url,
+        headless=headless,
+        slim=slim,
