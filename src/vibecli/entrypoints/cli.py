@@ -32,4 +32,49 @@ app.add_typer(mcp_app, name="mcp")
 console = Console()
 
 
-def _version_callback(value: bool) -> None:
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"vibecli {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+    prompt: Annotated[
+        str | None,
+        typer.Option("-p", "--prompt", help="Print mode: single prompt, non-interactive"),
+    ] = None,
+    model: Annotated[str | None, typer.Option("-m", "--model", help="Override model name")] = None,
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Override LLM provider"),
+    ] = None,
+    plain: Annotated[bool, typer.Option("--plain", help="Use plain text rendering")] = False,
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+    version: Annotated[
+        bool,
+        typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
+    ] = False,
+) -> None:
+    _ = version
+    if ctx.invoked_subcommand is not None:
+        return
+    root = (cwd or Path.cwd()).resolve()
+    overrides: dict = {}
+    if provider or model or plain:
+        overrides = {
+            "llm": {"provider": provider, "model": model},
+            "render_mode": "plain" if plain else None,
+        }
+    config = load_config(project_root=root, overrides=overrides)
+    if plain:
+        config.render_mode = "plain"
+    if prompt is not None:
+        asyncio.run(_run_prompt(prompt, str(root), config))
+    else:
+        asyncio.run(start_repl(str(root), config))
+
+
+@app.command("doctor")
+def doctor(
