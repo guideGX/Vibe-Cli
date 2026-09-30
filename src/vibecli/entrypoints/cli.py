@@ -200,4 +200,20 @@ async def _run_prompt(prompt: str, cwd: str, config) -> None:
     except Exception as exc:  # noqa: BLE001 - CLI should report model/config errors cleanly
         typer.echo(f"Fatal error: {exc}", err=True)
         raise typer.Exit(1) from exc
-    typer.echo(result.text)
+    typer.echo(result.text)
+
+
+def _version_of(command: str) -> str:
+    if not shutil.which(command):
+        return "missing"
+    try:
+        result = subprocess.run(
+            [command, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:  # noqa: BLE001
+        return "unknown"
+    return (result.stdout or result.stderr).strip() or "unknown"
