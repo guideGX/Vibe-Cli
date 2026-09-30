@@ -77,4 +77,49 @@ def main(
 
 
 @app.command("doctor")
-def doctor(
+def doctor(
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+) -> None:
+    root = (cwd or Path.cwd()).resolve()
+    config = load_config(project_root=root)
+    checks = {
+        "python": sys.version.split()[0],
+        "uv": shutil.which("uv") or "missing",
+        "node": _version_of("node"),
+        "npx": shutil.which("npx") or "missing",
+        "rg": shutil.which("rg") or "missing",
+        "api_key": "configured" if config.llm.api_key else "missing",
+        "provider": config.llm.provider,
+        "model": config.llm.model,
+        "cwd": str(root),
+        "config_paths": [str(path) for path in get_config_paths(root)],
+    }
+    console.print_json(json.dumps(checks, ensure_ascii=False))
+
+
+@app.command("serve")
+def runtime_serve(
+    http: Annotated[bool, typer.Option("--http", help="Serve Runtime API over HTTP")] = True,
+    port: Annotated[int, typer.Option("--port", help="HTTP port")] = 8080,
+    api_key: Annotated[
+        str | None,
+        typer.Option("--api-key", help="Runtime API key. Defaults to VIBECLI_RUNTIME_API_KEY."),
+    ] = None,
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+) -> None:
+    _ = http
+    root = (cwd or Path.cwd()).resolve()
+    config = load_config(project_root=root)
+    try:
+        key = runtime_api_key(api_key)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    RuntimeApiServer(cwd=str(root), config=config, api_key=key, port=port).serve_forever()
+
+
+@mcp_app.command("serve")
+def mcp_serve(
+    transport: Annotated[
+        str,
+        typer.Option("--transport", help="Transport type: stdio or http"),
