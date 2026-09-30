@@ -157,4 +157,47 @@ def mcp_init_chrome(
         scope_root=root,
         browser_url=browser_url,
         headless=headless,
-        slim=slim,
+        slim=slim,
+    )
+    typer.echo(f"Wrote Chrome DevTools MCP config to {path}")
+
+
+@mcp_app.command("list")
+def mcp_list(
+    cwd: Annotated[Path | None, typer.Option("--cwd", help="Working directory")] = None,
+) -> None:
+    root = (cwd or Path.cwd()).resolve()
+    specs = load_mcp_server_specs(root)
+    if not specs:
+        typer.echo("No MCP servers configured.")
+        return
+    for spec in specs.values():
+        target = spec.url or f"{spec.command} {' '.join(spec.args)}".strip()
+        typer.echo(f"{spec.name}\t{spec.type}\t{target}")
+
+
+async def _run_prompt(prompt: str, cwd: str, config) -> None:
+    config.render_mode = "plain"
+    if not config.llm.api_key:
+        typer.echo(
+            "Fatal error: VIBECLI_API_KEY is not configured. Set it in env, "
+            "~/.vibecli/config.json, or project .vibecli/config.json.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    registry, manager = await build_tool_registry(config=config, cwd=cwd)
+    if manager and manager.last_errors:
+        for name, error in manager.last_errors.items():
+            typer.echo(f"MCP server {name} failed to load: {error}", err=True)
+    engine = QueryEngine(
+        llm_client=create_llm_client(config.llm),
+        tool_registry=registry,
+        config=config,
+        cwd=cwd,
+    )
+    try:
+        result = await engine.ask_complete_async(prompt)
+    except Exception as exc:  # noqa: BLE001 - CLI should report model/config errors cleanly
+        typer.echo(f"Fatal error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(result.text)
