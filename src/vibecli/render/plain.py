@@ -15,4 +15,12 @@ class PlainRenderer:
             sys.stdout.flush()
         elif self.print_events and event_type == "tool_call":
             sys.stdout.write(f"\n[tool] {event.get('name')} {event.get('input')}\n")
-            sys.stdout.flush()
+            sys.stdout.flush()
+        elif self.print_events and event_type == "tool_result":
+            marker = "error" if event.get("is_error") else "result"
+            sys.stdout.write(f"[tool:{marker}] {event.get('name')}: {event.get('result')}\n")
+            sys.stdout.flush()
+
+    def newline(self) -> None:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
