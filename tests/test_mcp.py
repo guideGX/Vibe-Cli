@@ -45,4 +45,22 @@ if __name__ == "__main__":
     (tmp_path / ".vibecli").mkdir()
     (tmp_path / ".vibecli" / "mcp.json").write_text(
         json.dumps(
-            {
+            {
+                "mcpServers": {
+                    "fake": {
+                        "type": "stdio",
+                        "command": "python",
+                        "args": [str(server)],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    async def run():
+        manager = McpClientManager(tmp_path)
+        tools = await manager.load_tools()
+        names = [tool.name for tool in tools]
+        tool = next(item for item in tools if item.name == "mcp__fake__echo")
+        config = load_config(project_root=tmp_path)
