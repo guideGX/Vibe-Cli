@@ -29,4 +29,20 @@ def test_mcp_client_registers_and_calls_stdio_tool(tmp_path, monkeypatch):
     server = tmp_path / "fake_mcp_server.py"
     server.write_text(
         """
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("fake")
+
+@mcp.tool()
+def echo(text: str) -> str:
+    return "echo:" + text
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / ".vibecli").mkdir()
+    (tmp_path / ".vibecli" / "mcp.json").write_text(
+        json.dumps(
+            {
