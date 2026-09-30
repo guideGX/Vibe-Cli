@@ -63,4 +63,34 @@ if __name__ == "__main__":
         tools = await manager.load_tools()
         names = [tool.name for tool in tools]
         tool = next(item for item in tools if item.name == "mcp__fake__echo")
-        config = load_config(project_root=tmp_path)
+        config = load_config(project_root=tmp_path)
+        config.policy.hitl_mode = "never"
+        result = await tool.execute({"text": "ok"}, ToolContext(cwd=str(tmp_path), config=config))
+        return names, result
+
+    names, result = asyncio.run(run())
+    assert "mcp__fake__echo" in names
+    assert result.content == "echo:ok"
+
+
+def test_mcp_client_suppresses_stdio_server_stderr(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    server = tmp_path / "noisy_mcp_server.py"
+    server.write_text(
+        """
+import sys
+from mcp.server.fastmcp import FastMCP
+
+sys.stderr.write("NOISY_MCP_STARTUP\\n")
+sys.stderr.flush()
+
+mcp = FastMCP("noisy")
+
+@mcp.tool()
+def echo(text: str) -> str:
+    return text
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+""".lstrip(),
+        encoding="utf-8",
