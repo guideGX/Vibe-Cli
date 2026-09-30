@@ -93,4 +93,30 @@ def echo(text: str) -> str:
 if __name__ == "__main__":
     mcp.run(transport="stdio")
 """.lstrip(),
-        encoding="utf-8",
+        encoding="utf-8",
+    )
+    (tmp_path / ".vibecli").mkdir()
+    (tmp_path / ".vibecli" / "mcp.json").write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "noisy": {
+                        "type": "stdio",
+                        "command": "python",
+                        "args": [str(server)],
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    async def run():
+        manager = McpClientManager(tmp_path)
+        return await manager.load_tools()
+
+    tools = asyncio.run(run())
+
+    assert any(tool.name == "mcp__noisy__echo" for tool in tools)
+    captured = capsys.readouterr()
+    assert "NOISY_MCP_STARTUP" not in captured.err
