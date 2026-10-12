@@ -2,26 +2,7 @@
 
 VibeCLI Python 是一个运行在终端里的 AI Agent CLI，面向真实项目开发场景：读写文件、搜索代码、执行命令、联网检索、调用 MCP 工具、保存记忆、生成快照、恢复现场，并通过 Runtime API 对外提供线程、turn、事件和后台任务能力。
 
-![](https://cdn.paicoding.com/stutymore/best-city-ai-agent-jd-20260708142704.png)
 
-这个仓库是 VibeCLI 的 Python 版本。它不是一个空壳 Demo，而是按真实 CLI 产品来做：核心路径有测试覆盖，也经过本地 smoke 和真实终端运行验证。
-
-## 配套教程路线
-
-如果你是为了学习 Agent 工程、准备简历或准备面试，可以先看这条教程路线：
-
-[VibeCLI 学习路线：手搓一个 Java 版 Claude Code](https://paicoding.com/paicli-learning-path)
-
-这篇路线不是单纯教你“从第一行源码看到最后一行”，而是按真实学习和求职路径来组织：
-
-- 先把 VibeCLI 在本地跑起来，直观看到 ReAct、工具调用、Plan 模式和联网搜索是怎么工作的
-- 再把项目能力拆成可以写进简历的模块，比如 ReAct、Plan-and-Execute、Memory、RAG、MCP、HITL、多模态和 Runtime API
-- 然后围绕简历里写到的模块去深挖源码，并同步准备对应的 Agent 面试题
-- 最后通过 debug、改 bug、加工具、整理踩坑笔记，把项目真正变成自己的工程经验
-
-教程目录覆盖实战篇、简历篇和面试篇，适合作为学习 VibeCLI Java 版和理解本 Python 版设计取舍的路线图。
-
-![](https://cdn.paicoding.com/stutymore/paicli-python-launch-20260708161001.png)
 
 ## 功能特性
 
@@ -374,15 +355,3 @@ uv run vibecli doctor --cwd .
 uv run vibecli --plain -p hello
 ```
 
-## 和 Java / TypeScript 版本的关系
-
-Python 版覆盖了 Java / TypeScript 版本里公开、开放协议相关的主要 Agent CLI 能力，包括 CLI、REPL、ReAct、Plan-and-Execute、Multi-Agent、Skill、SDK、工具调用、MCP、Runtime API、记忆、快照、联网工具和图片输入。
-
-Java 版本里还有一个私有的微信 iLink 通道。Python 仓库没有内置这个私有通道，因为它依赖账号、扫码登录和协议凭证，不应该用假实现冒充。
-
-更详细的实现对齐情况见 [docs/parity.md](docs/parity.md)。
-
-> 更新说明：本文件持续完善中，功能与配置以最新代码为准。
-## License
-
-MIT. See [LICENSE](LICENSE).
