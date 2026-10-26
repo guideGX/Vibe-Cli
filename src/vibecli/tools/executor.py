@@ -81,7 +81,7 @@ class ToolExecutor:
                 )
                 return ToolResult(
                     tool_use_id=tool_call_id,
-                    content=f'Tool "{tool.name}" was {decision}ed by approval policy.',
+                    content=(f'Tool "{tool.name}" was {_past_tense(decision)} by approval policy.'),
                     is_error=True,
                 )
             if tool.requires_approval or context.config.policy.hitl_mode == "always":
@@ -137,6 +137,10 @@ class ToolExecutor:
         if asyncio.iscoroutine(result):
             result = await result
         return result
+
+
+def _past_tense(decision: ToolDecision) -> str:
+    return "denied" if decision == "deny" else "skipped"
 
 
 def _tool_call_name(call: dict[str, Any]) -> str:
