@@ -5,6 +5,34 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `tests/test_windows_shell.py` — 5 cases pinning GBK output decoding, UTF-8 priority,
+  the `VIBECLI_SHELL=cmd` opt-out, and bracket preservation in the approval panel.
+- `docs/bugs/2026-10-26-windows-shell-and-markup.md` — post-mortem with reproduction,
+  root cause, verification table, and the CI gap that let it survive 97 green tests.
+- CI now runs the matrix on `ubuntu-latest` **and** `windows-latest` (`fail-fast: false`).
+
+### Changed
+
+- The `bash` / `execute_command` tool descriptions now state that a POSIX shell is used when
+  available, so the model stops writing GNU-only pipelines against `cmd.exe`.
+
+### Fixed
+
+- **Windows: `bash` was unusable.** `asyncio.create_subprocess_shell` goes through `COMSPEC`,
+  i.e. `cmd.exe`, so `| head`, `wc` and GNU `find` did not exist and the agent could only fall
+  back to `python -c` one-liners. Spawn `bash -c` directly when a POSIX shell is on PATH,
+  falling back to the old path otherwise; `VIBECLI_SHELL` overrides, `cmd`/`default` opts out.
+- **Windows: every error message came back as `����`.** Console output was decoded as UTF-8 while
+  `cmd.exe` emits GBK, so the model could not read why a command failed. Decoding now tries
+  UTF-8, then the locale encoding, then GBK, and only then `errors="replace"`.
+- **The approval panel showed a different command than the one about to run.** `_approval_prompt`
+  printed the payload through `console.print(f"...")`, so rich parsed `[pathlib.Path('src')]` as
+  markup and dropped it. Render it as `Text` and pretty-print the payload as indented JSON.
+
 ## [0.1.0] - 2026-10-26
 
 First tagged release. The feature surface below is what exists in `src/vibecli` today; anything
