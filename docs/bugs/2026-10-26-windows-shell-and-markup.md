@@ -241,11 +241,101 @@ strategy:
 
 ---
 
+## 第二轮：把「同类假设」系统扫一遍
+
+修完前三项后追问了一句：**这三个假设是孤例，还是同一类问题的前三个样本？**
+
+排查方法：全局搜所有「拿外部字节」和「产出外部字节」的调用点。
+
+```bash
+grep -rn 'encoding="utf-8"\|text=True\|splitlines()' src/vibecli --include=*.py
+grep -rn "os.linesep\|os.path\|startswith(\"/\")" src/vibecli --include=*.py
+```
+
+结论：**换行符和路径分隔符是安全的**（Orchestrator 里显式归一化了 `\r\n`，路径全部走 pathlib），但**文件读写层的假设比管道层更危险**。
+
+### 最严重的一个：读坏再写回 = 数据丢失
+
+```python
+# src/vibecli/tools/builtins.py（旧）
+content = path.read_text(encoding="utf-8", errors="replace").splitlines()   # read_file
+...
+with path.open(mode, encoding="utf-8") as handle:                          # write_file
+    handle.write(content)
+```
+
+实测一条 GBK 源码文件的完整往返：
+
+| 阶段 | 结果 |
+| --- | --- |
+| 原文件（GBK） | `# 这是原有的中文注释` |
+| `read_file` 返回 | `# ����ԭ�е�����ע��` ← 已经是 U+FFFD |
+| 照原样 `write_file` 写回 | 字节里混着 `\xef\xbf\xbd` 和残留的 GBK 字节 |
+| 再按 GBK 读取 | `# 锟斤拷锟斤拷原锟叫碉拷锟斤拷锟斤拷注锟斤拷` |
+
+**模型读一个 GBK 文件、改一行、整体写回，原文件里的中文就永久损坏了。** 它比 shell 那个 bug 严重一个数量级：shell 只是跑不动，这个是毁用户文件，而且全程无声。
+
+### 同类的其余样本
+
+| 位置 | 假设 | 后果 |
+| --- | --- | --- |
+| `grep()` | `errors="ignore"` | GBK 文件里的中文行被整行丢弃，搜不到 |
+| `rag/code_index.py` | `errors="ignore"` | 索引里缺 GBK 文件的中文，RAG 检索失效 |
+| `prompt/assembler.py` | `read_text(encoding="utf-8")`，只 catch `OSError` | 记事本写的 GBK `VIBE.md` 抛 `UnicodeDecodeError`，**REPL 起不来** |
+| `skill/registry.py` | 同上 | 一个 GBK 的 `SKILL.md` 让整个 skill 加载失败 |
+| `cli.py::_version_of` | `text=True` | 用 locale（cp936）去解 node 的 UTF-8 输出 |
+
+`prompt/assembler` 那条特别值得注意：`except OSError` 接不住 `UnicodeDecodeError`，于是**一个用记事本写的记忆文件能让整个 CLI 启动失败**，而且报错位置离真正的原因很远。
+
+### 修复过程中撞出的第二层问题
+
+第一版修法是「一律写 UTF-8 + 提示模型」。改完重跑验证，诊断立刻报错：
+
+```
+SyntaxError: 'gbk' codec can't decode byte 0x8a in position 50
+```
+
+因为文件头还留着 `# -*- coding: gbk -*-`，Python 就按 GBK 去解一份 UTF-8 字节。**修编码反而把文件变成了语法错误。**
+
+这是本次最有价值的一课：**假设是成链的，修掉一个会露出下一个。**
+
+最终设计改成「读什么编码就写什么编码」：
+
+1. 写入前探测原文件编码，用它编码写回（GBK 文件继续是 GBK，声明依然有效）
+2. 只有内容含原编码表示不了的字符（emoji、生僻字）才退回 UTF-8
+3. 退回 UTF-8 时**同步改写头部 coding 声明**，避免「字节 UTF-8、声明 GBK」的自相矛盾
+
+### 收敛到一处
+
+```python
+# src/vibecli/textio.py — 新增，所有编解码的唯一入口
+decode_chain()      # UTF-8 → 系统 ANSI 代码页 → (Windows) cp936
+decode_bytes()      # 逐行判断
+read_text_file()    # 文件 → (文本, 使用的编码)
+is_utf8()
+```
+
+关键细节：**用 `locale.getencoding()` 而不是 `locale.getpreferredencoding()`**。实测在 uv 环境下：
+
+```
+locale.getpreferredencoding(False) = 'utf-8'      # PYTHONUTF8=1
+locale.getencoding()               = 'cp936'      # 真正想要的
+```
+
+`getpreferredencoding()` 在 UTF-8 模式下会返回 "utf-8"，把真正要兜的代码页盖掉——**任何「用 locale 兜底 GBK」的写法在这个环境下都是空转的**。`getencoding()`（3.11+）不受 UTF-8 模式影响，才是正确 API。
+
+### 一个无法消除的边界（不是 bug）
+
+纯 ASCII 文件同时是合法 UTF-8 和合法 GBK，**从字节上无法判断它「原本」是什么编码**。我们的探测会报 UTF-8。这不需要修：两种解释下字节完全相同，读和写都不会出错。
+
+---
+
 ## 遗留
 
 | 项 | 状态 |
 | --- | --- |
-| `cli.py::_version_of` 用 `text=True`，Windows 上按 cp936 解码 UTF-8 输出 | 未改。当前显示正常，属同类隐患 |
+| `cli.py::_version_of` 用 `text=True` | 已修（第二轮，改走 `decode_bytes`） |
+| 文件读写、grep、索引、prompt、skill 的 UTF-8 假设 | 已修（统一收敛到 `vibecli.textio`） |
 | MCP stdio 启动 `npx` 在 Windows 上的行为 | 实测可跑（`npx --version` → 11.19.1），未确认问题，不下结论 |
 | 模型写 `find ... -o ...` 缺括号，条件松散 | 工具层无法纠正。属模型侧命令严谨性，靠工具描述提示缓解 |
 
@@ -258,3 +348,4 @@ strategy:
 3. **写配置/展示类代码时，问一句「这段内容会不会被当成语法解析」。** 富文本、模板、SQL、正则，凡是「接收字符串再解析」的接口都有这个坑。
 4. **测试的环境维度要单列。** 同一个测试在 Linux 绿、在 Windows 红，说明被测代码隐含了平台契约 —— 这是设计信息，不是噪音。
 5. **模型的自我诊断经常是对的，错的是它脚下的环境。** 截图里它明确说了「maybe the shell is cmd」，但还是得绕路。给人看的日志里，这类 Thinking 是定位问题的第一手线索，不该只当调试信息。
+6. **假设是成链的，修掉一个会露出下一个。** 修好「读坏文件」之后才撞到「转码让 coding 声明失效」。所以修复必须以「端到端跑一遍真场景」收尾，而不是以「单测全绿」收尾——第一次修完单测也全绿，但真场景把文件变成了语法错误。

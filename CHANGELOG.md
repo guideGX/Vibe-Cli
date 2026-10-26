@@ -9,6 +9,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `vibecli.textio` — single entry point for decoding external bytes (UTF-8 → system ANSI
+  code page → cp936 on Windows), with per-line detection so one stream can mix encodings.
+- `tests/test_textio.py` — 11 cases covering GBK reads, mixed-encoding streams, encoding
+  preservation on write, the UTF-8 fallback for unrepresentable text, and CJK grep hits.
 - `tests/test_windows_shell.py` — 5 cases pinning GBK output decoding, UTF-8 priority,
   the `VIBECLI_SHELL=cmd` opt-out, and bracket preservation in the approval panel.
 - `docs/bugs/2026-10-26-windows-shell-and-markup.md` — post-mortem with reproduction,
@@ -32,6 +36,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The approval panel showed a different command than the one about to run.** `_approval_prompt`
   printed the payload through `console.print(f"...")`, so rich parsed `[pathlib.Path('src')]` as
   markup and dropped it. Render it as `Text` and pretty-print the payload as indented JSON.
+- **Reading a GBK file and writing it back destroyed its text.** `read_file` decoded with
+  `errors="replace"`, so a GBK source file came back as U+FFFD placeholders; one edit written
+  back to disk produced the classic `锟斤拷` corruption. Files are now decoded with detection and
+  the encoding is reported to the model.
+- **`write_file` turned GBK files into SyntaxErrors.** Writing UTF-8 while a `coding: gbk`
+  declaration remained made Python decode UTF-8 bytes as GBK. It now keeps the detected
+  encoding, falls back to UTF-8 only for unrepresentable characters, and retargets the coding
+  declaration when it does.
+- **CJK text inside GBK files was invisible** to `grep` and the local code index, which read
+  with `errors="ignore"` / `errors="replace"`.
+- **A GBK `VIBE.md` or `SKILL.md` could prevent startup.** `prompt/assembler` and
+  `skill/registry` only caught `OSError`, so a Notepad-written memory file raised
+  `UnicodeDecodeError` on the way up.
+- `cli._version_of` decoded UTF-8 tool output through the locale (`text=True`).
 
 ## [0.1.0] - 2026-10-26
 
