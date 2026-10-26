@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="356" viewBox="0 0 820 356" role="img" aria-label="VibeCLI 终端输出：vibecli --version 与 vibecli doctor">
+  <defs>
+    <clipPath id="card">
+      <rect x="0" y="0" width="820" height="356" rx="12" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="820" height="356" fill="#FFFFFF" />
+    <rect width="820" height="34" fill="#F3F4F6" />
+    <circle cx="22" cy="17" r="5.5" fill="#F87171" />
+    <circle cx="42" cy="17" r="5.5" fill="#FBBF24" />
+    <circle cx="62" cy="17" r="5.5" fill="#34D399" />
+    <text x="410" y="22" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#6B7280">vibecli — Windows Terminal</text>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13.5" fill="#1F2937">
+      <text x="24" y="62" fill="#2563EB">$ uv run vibecli --version</text>
+      <text x="24" y="84">vibecli 0.1.0</text>
+
+      <text x="24" y="118" fill="#2563EB">$ uv run vibecli doctor --cwd .</text>
+      <text x="24" y="140">{</text>
+      <text x="38" y="162">"python"<tspan fill="#0F766E">: "3.11.2"</tspan>,</text>
+      <text x="38" y="184">"node"<tspan fill="#0F766E">: "v22.22.2"</tspan>,</text>
+      <text x="38" y="206">"api_key"<tspan fill="#0F766E">: "missing"</tspan>,</text>
+      <text x="38" y="228">"provider"<tspan fill="#0F766E">: "deepseek"</tspan>,</text>
+      <text x="38" y="250">"model"<tspan fill="#0F766E">: "deepseek-v4-flash"</tspan></text>
+      <text x="24" y="272">}</text>
+
+      <text x="24" y="306" fill="#2563EB">$ uv run vibecli mcp list --cwd .</text>
+      <text x="24" y="328">chrome-devtools	stdio	npx -y chrome-devtools-mcp@latest --no-usage-statistics</text>
+    </g>
+  </g>
+
+  <rect x="0.5" y="0.5" width="819" height="355" rx="12" fill="none" stroke="#E5E7EB" />
+</svg>

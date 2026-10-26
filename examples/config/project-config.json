@@ -1,0 +1,47 @@
+{
+  "render_mode": "inline",
+  "llm": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "max_tokens": 8192,
+    "temperature": 0.7,
+    "timeout": 120.0
+  },
+  "tools": {
+    "timeout": 60.0,
+    "batch_timeout": 90.0,
+    "max_concurrent_read": 4
+  },
+  "memory": {
+    "max_conversation_history": 100,
+    "long_term_enabled": true,
+    "token_budget_mode": "balanced",
+    "compression_threshold": 0.8
+  },
+  "policy": {
+    "hitl_mode": "always",
+    "path_guard_enabled": true,
+    "command_blacklist": [
+      "sudo",
+      "rm -rf /",
+      "rm -rf ~",
+      "mkfs",
+      "dd if=/dev/zero",
+      ":(){:|:&};:",
+      "chmod -R 777 /",
+      "curl | sh",
+      "curl|sh",
+      "shutdown",
+      "reboot",
+      "git push --force"
+    ]
+  },
+  "features": {
+    "mcp": true,
+    "skill": true,
+    "memory": true,
+    "audit_log": true,
+    "context_compression": true,
+    "code_index": true
+  }
+}

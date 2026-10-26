@@ -123,7 +123,6 @@ This file tracks the Python port against the existing Java and TypeScript implem
 - Diagnostics:
   - Python syntax diagnostics after `write_file`
 
-- Parity item reviewed (see commit history).
 ## Live Dependencies
 
 These features need external credentials or platform state for live verification:
@@ -139,12 +138,40 @@ The Java implementation has a WeChat iLink channel. Python does not ship that pr
 
 ## Verification
 
+Offline and deterministic — no API key or network needed:
+
 ```bash
 uv run --extra dev ruff check .
 uv run --extra dev ruff format --check .
-uv run --extra dev python -m pytest
+uv run --extra dev pytest
 uv build
+```
+
+Manual smoke checks (need a configured key for the prompt run):
+
+```bash
+uv run vibecli --version
 uv run vibecli --help
 uv run vibecli doctor --cwd .
+uv run vibecli mcp list --cwd .
 uv run vibecli mcp serve --transport http --port 3999
 ```
+
+## Test coverage
+
+`tests/` covers the layers that can be verified without a live model. The LLM boundary is
+replaced by a scripted client that replays raw stream events (`tests/helpers.py::ScriptedLlm`),
+and `Path.home()` is redirected into a temp directory per test, so state written under
+`~/.vibecli` never touches the real home.
+
+| Area | File | What is pinned |
+| --- | --- | --- |
+| Config layering | `test_config.py` | defaults, user/project config, `.env`, process env, provider keys, redaction |
+| Safety | `test_policy.py` | path escapes, destructive command patterns, audit redaction and ordering |
+| Tools | `test_tools.py` | registry contents, read/write behaviour, parallel reads, serial writes, HITL deny, unknown tool |
+| ReAct loop | `test_react_loop.py` | event sequence, streamed tool-call merging, max_turns bound, history continuity |
+| Snapshots | `test_snapshot.py` | pre/post records, ignore rules, restore by id/index, safety snapshot |
+| Runtime API | `test_runtime_api.py` | auth, thread creation, event log, task lifecycle, durability across restart |
+| Memory / RAG | `test_memory_and_index.py` | scoping, search semantics, index rebuild and ignore rules |
+| MCP / CLI / SDK | `test_cli_and_mcp.py` | config writing and merging, env expansion, `--version` / `--help` / `doctor`, engine wiring |
+| Image input | `test_image_input.py` | reference parsing, downscaling, transparent flattening, path escape rejection |
