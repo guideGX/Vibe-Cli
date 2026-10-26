@@ -6,6 +6,8 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from vibecli.textio import read_text_file
+
 
 @dataclass(slots=True)
 class Skill:
@@ -183,7 +185,7 @@ class SkillRegistry:
 
     def _load_skill_file(self, path: Path, source: str, disabled: set[str]) -> Skill | None:
         try:
-            content = path.read_text(encoding="utf-8")
+            content = read_text_file(path)[0]
         except OSError:
             return None
         metadata = _parse_frontmatter(content)

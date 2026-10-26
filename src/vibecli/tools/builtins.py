@@ -4,6 +4,7 @@ import asyncio
 import glob as glob_module
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from vibecli.policy import CommandGuard, PathGuard
 from vibecli.rag import CodeIndex
 from vibecli.skill import SkillRegistry
 from vibecli.snapshot import SnapshotService
+from vibecli.textio import decode_bytes, is_utf8, read_text_file
 from vibecli.tools.base import Tool, ToolContext, ToolResult, object_schema
 from vibecli.web import fetch_url, search_web
 
@@ -118,7 +120,11 @@ def get_builtin_tools() -> list[Tool]:
         ),
         Tool(
             name="bash",
-            description="Execute a shell command in the current workspace.",
+            description=(
+                "Execute a shell command in the current workspace. Runs through a POSIX "
+                "shell (bash/sh) when one is available, otherwise the platform default. "
+                "Prefer portable commands and quote paths containing spaces."
+            ),
             parameters=object_schema(
                 {
                     "command": {"type": "string", "description": "Shell command"},
@@ -135,7 +141,10 @@ def get_builtin_tools() -> list[Tool]:
         ),
         Tool(
             name="execute_command",
-            description="Alias of bash. Execute a shell command in the current workspace.",
+            description=(
+                "Alias of bash. Execute a shell command in the current workspace through "
+                "a POSIX shell (bash/sh) when one is available."
+            ),
             parameters=object_schema(
                 {
                     "command": {"type": "string", "description": "Shell command"},
@@ -236,10 +245,19 @@ async def read_file(payload: dict[str, Any], context: ToolContext) -> ToolResult
     path = _resolve_path(context, str(payload["path"]))
     offset = max(int(payload.get("offset") or 1), 1)
     limit = int(payload.get("limit") or 500)
-    content = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    text, encoding = read_text_file(path)
+    content = text.splitlines()
     selected = content[offset - 1 : offset - 1 + limit]
     numbered = "\n".join(f"{idx + offset}: {line}" for idx, line in enumerate(selected))
-    return ToolResult(numbered, display_summary=f"Read {path.relative_to(context.cwd)}")
+    header = ""
+    if not is_utf8(encoding):
+        # 明确告诉模型这份内容的编码。否则它会把非 UTF-8 的字节当成正常文本
+        # 编辑，写回时把整份文件的中文毁掉。
+        header = (
+            f"[note] {path.relative_to(context.cwd)} is encoded as {encoding}, not UTF-8. "
+            "write_file keeps this encoding when it can.\n"
+        )
+    return ToolResult(header + numbered, display_summary=f"Read {path.relative_to(context.cwd)}")
 
 
 async def write_file(payload: dict[str, Any], context: ToolContext) -> ToolResult:
@@ -247,16 +265,50 @@ async def write_file(payload: dict[str, Any], context: ToolContext) -> ToolResul
     content = str(payload["content"])
     if len(content.encode("utf-8")) > 5 * 1024 * 1024:
         return ToolResult("write_file rejected: content exceeds 5MB", is_error=True)
+
+    # 读什么编码就写什么编码。一律转 UTF-8 会让遗留 GBK 项目的注释内容和
+    # coding 声明互相矛盾，转完直接语法错误。
+    original = read_text_file(path)[1] if path.is_file() else None
+    encoding = "utf-8" if original is None or is_utf8(original) else original
+    try:
+        data = content.encode(encoding)
+    except UnicodeEncodeError:
+        # 内容里有原编码表示不了的字符（emoji、生僻字）：退回 UTF-8，并同步
+        # 改掉头部声明，避免「字节是 UTF-8、声明说 GBK」的自相矛盾。
+        encoding = "utf-8"
+        content = _retarget_coding_declaration(content, "utf-8")
+        data = content.encode("utf-8")
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if payload.get("append") else "w"
-    with path.open(mode, encoding="utf-8") as handle:
-        handle.write(content)
+    with path.open("ab" if payload.get("append") else "wb") as handle:
+        handle.write(data)
+
     rel = path.relative_to(context.cwd)
-    diagnostics = diagnose_file(path)
     suffix = ""
+    if original is not None and not is_utf8(original):
+        if is_utf8(encoding):
+            suffix += f"\n[note] {rel} was {original}; rewritten as UTF-8 (fallback)."
+        else:
+            suffix += f"\n[note] {rel} kept {encoding} encoding."
+    diagnostics = diagnose_file(path)
     if diagnostics:
-        suffix = "\n\nDiagnostics:\n" + "\n".join(diagnostics)
+        suffix += "\n\nDiagnostics:\n" + "\n".join(diagnostics)
     return ToolResult(f"Wrote {rel}{suffix}", display_summary=f"Wrote {rel}")
+
+
+_CODING_DECLARATION = re.compile(r"coding[:=]\s*([-\w.]+)")
+
+
+def _retarget_coding_declaration(text: str, encoding: str) -> str:
+    """改写源文件头部的编码声明。
+
+    转码后若继续保留 ``# -*- coding: gbk -*-``，Python 会拿 GBK 去解一份
+    UTF-8 字节，直接 SyntaxError —— 转码反而把文件弄成语法错误。
+    """
+    head, separator, rest = text.partition("\n")
+    if not _CODING_DECLARATION.search(head):
+        return text
+    return _CODING_DECLARATION.sub(f"coding: {encoding}", head, count=1) + separator + rest
 
 
 async def list_dir(payload: dict[str, Any], context: ToolContext) -> ToolResult:
@@ -306,7 +358,7 @@ async def grep(payload: dict[str, Any], context: ToolContext) -> ToolResult:
         if _skip_file(file_path):
             continue
         try:
-            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            lines = read_text_file(file_path)[0].splitlines()
         except OSError:
             continue
         for line_number, line in enumerate(lines, start=1):
@@ -318,12 +370,42 @@ async def grep(payload: dict[str, Any], context: ToolContext) -> ToolResult:
     return ToolResult("\n".join(matches) or "(no matches)")
 
 
+_SHELL_DISABLED_VALUES = {"", "default", "cmd", "cmd.exe", "powershell", "pwsh"}
+
+
+def _resolve_posix_shell() -> str | None:
+    """Windows 上优先用 POSIX shell，让 find/head/wc/grep 这些命令能用。
+
+    - 非 Windows：返回 None，保持 /bin/sh 的默认行为
+    - `VIBECLI_SHELL=bash 路径`：显式指定
+    - `VIBECLI_SHELL=cmd|default|powershell`：强制回退系统 shell
+    """
+    override = os.environ.get("VIBECLI_SHELL", "").strip()
+    if override:
+        if override.lower() in _SHELL_DISABLED_VALUES:
+            return None
+        if Path(override).exists() or shutil.which(override):
+            return override
+        return None
+    if os.name != "nt":
+        return None
+    return shutil.which("bash")
+
+
+def _decode_output(raw: bytes) -> str:
+    """解码子进程输出，逐行判断编码（同一流里可能混着 UTF-8 和 GBK）。"""
+    return decode_bytes(raw)[0]
+
+
 async def bash(payload: dict[str, Any], context: ToolContext) -> ToolResult:
     command = str(payload["command"])
     CommandGuard(context.config.policy.command_blacklist).validate(command)
     timeout = float(payload.get("timeout") or context.config.tools.timeout)
-    proc = await asyncio.create_subprocess_shell(
-        command,
+    shell = _resolve_posix_shell()
+    spawn = asyncio.create_subprocess_exec if shell else asyncio.create_subprocess_shell
+    args = [shell, "-c", command] if shell else [command]
+    proc = await spawn(
+        *args,
         cwd=context.cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -335,7 +417,7 @@ async def bash(payload: dict[str, Any], context: ToolContext) -> ToolResult:
         proc.kill()
         await proc.wait()
         return ToolResult(f"Command timed out after {timeout:.0f}s", is_error=True)
-    output = (stdout + stderr).decode("utf-8", errors="replace")
+    output = _decode_output(stdout + stderr)
     if len(output) > 20_000:
         output = output[:20_000] + "\n... [truncated]"
     return ToolResult(

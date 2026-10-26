@@ -13,6 +13,7 @@ from prompt_toolkit.styles import Style
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
+from rich.text import Text
 
 from vibecli import __version__
 from vibecli.agent import Agent, AgentOrchestrator, PlanExecuteAgent
@@ -370,10 +371,18 @@ def _snapshot_command(arg: str, console: Console, cwd: str) -> None:
 def _approval_prompt(request: dict[str, Any], console: Console, config: VibeCliConfig) -> str:
     if not sys.stdin.isatty():
         return "deny"
+    try:
+        body = json.dumps(request["input"], ensure_ascii=False, indent=2)
+    except (TypeError, ValueError):
+        body = str(request["input"])
     console.print(
-        f"[yellow]Approval required[/yellow] {request['tool_name']} "
-        f"({request['danger_level']})\n{request['input']}"
+        Text.assemble(
+            (f"Approval required {request['tool_name']}", "yellow"),
+            (f" ({request['danger_level']})", "yellow"),
+        )
     )
+    # Text 不走 markup 解析，命令里的 [..] 会被原样保留
+    console.print(Text(body, style="dim"))
     answer = Prompt.ask("Approve?", choices=["y", "n", "a", "s"], default="n")
     if answer == "a":
         config.policy.hitl_mode = "never"

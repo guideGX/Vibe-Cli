@@ -8,7 +8,12 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    name: ci (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -24,11 +29,15 @@ jobs:
           uv run --extra dev ruff check .
           uv run --extra dev ruff format --check .
 
+      - name: Test
+        run: uv run --extra dev pytest
+
       - name: Smoke test
         run: |
           uv run vibecli --version
           uv run vibecli --help
           uv run vibecli doctor --cwd .
+          uv run vibecli mcp list --cwd .
 
       - name: Build
         run: uv build
