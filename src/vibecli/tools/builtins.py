@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import glob as glob_module
+import locale
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -318,12 +320,52 @@ async def grep(payload: dict[str, Any], context: ToolContext) -> ToolResult:
     return ToolResult("\n".join(matches) or "(no matches)")
 
 
+_SHELL_DISABLED_VALUES = {"", "default", "cmd", "cmd.exe", "powershell", "pwsh"}
+
+
+def _resolve_posix_shell() -> str | None:
+    """Windows 上优先用 POSIX shell，让 find/head/wc/grep 这些命令能用。
+
+    - 非 Windows：返回 None，保持 /bin/sh 的默认行为
+    - `VIBECLI_SHELL=bash 路径`：显式指定
+    - `VIBECLI_SHELL=cmd|default|powershell`：强制回退系统 shell
+    """
+    override = os.environ.get("VIBECLI_SHELL", "").strip()
+    if override:
+        if override.lower() in _SHELL_DISABLED_VALUES:
+            return None
+        if Path(override).exists() or shutil.which(override):
+            return override
+        return None
+    if os.name != "nt":
+        return None
+    return shutil.which("bash")
+
+
+def _decode_output(raw: bytes) -> str:
+    """Windows 控制台输出常见 GBK，硬按 UTF-8 解会变成一堆替换字符。"""
+    if not raw:
+        return ""
+    encodings = ["utf-8", locale.getpreferredencoding(False), "gbk"]
+    for encoding in encodings:
+        if not encoding:
+            continue
+        try:
+            return raw.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 async def bash(payload: dict[str, Any], context: ToolContext) -> ToolResult:
     command = str(payload["command"])
     CommandGuard(context.config.policy.command_blacklist).validate(command)
     timeout = float(payload.get("timeout") or context.config.tools.timeout)
-    proc = await asyncio.create_subprocess_shell(
-        command,
+    shell = _resolve_posix_shell()
+    spawn = asyncio.create_subprocess_exec if shell else asyncio.create_subprocess_shell
+    args = [shell, "-c", command] if shell else [command]
+    proc = await spawn(
+        *args,
         cwd=context.cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -335,7 +377,7 @@ async def bash(payload: dict[str, Any], context: ToolContext) -> ToolResult:
         proc.kill()
         await proc.wait()
         return ToolResult(f"Command timed out after {timeout:.0f}s", is_error=True)
-    output = (stdout + stderr).decode("utf-8", errors="replace")
+    output = _decode_output(stdout + stderr)
     if len(output) > 20_000:
         output = output[:20_000] + "\n... [truncated]"
     return ToolResult(
