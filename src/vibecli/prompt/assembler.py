@@ -6,6 +6,7 @@ from pathlib import Path
 from vibecli.config import VibeCliConfig
 from vibecli.memory import MemoryManager
 from vibecli.skill import SkillRegistry
+from vibecli.textio import read_text_file
 
 
 class PromptAssembler:
@@ -59,7 +60,9 @@ class PromptAssembler:
         for path in memory_files:
             if path.exists():
                 try:
-                    chunks.append(path.read_text(encoding="utf-8")[:4000])
+                    # 记事本写出的 VIBE.md 常是 ANSI/GBK，硬按 UTF-8 读会抛
+                    # UnicodeDecodeError 直接把 REPL 拦在启动前
+                    chunks.append(read_text_file(path)[0][:4000])
                 except OSError:
                     continue
         if self.config.features.memory and self.config.memory.long_term_enabled:

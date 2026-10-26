@@ -20,6 +20,7 @@ from vibecli.llm import create_llm_client
 from vibecli.mcp import load_mcp_server_specs, serve_http, serve_stdio, write_chrome_devtools_config
 from vibecli.runtime import RuntimeApiServer
 from vibecli.runtime.api import runtime_api_key
+from vibecli.textio import decode_bytes
 
 app = typer.Typer(
     name="vibecli",
@@ -211,9 +212,9 @@ def _version_of(command: str) -> str:
             [command, "--version"],
             check=False,
             capture_output=True,
-            text=True,
             timeout=5,
         )
     except Exception:  # noqa: BLE001
         return "unknown"
-    return (result.stdout or result.stderr).strip() or "unknown"
+    # 不用 text=True：那会用 locale 编码解码，而 node/uv 输出的是 UTF-8
+    return decode_bytes((result.stdout or b"") + (result.stderr or b""))[0].strip() or "unknown"

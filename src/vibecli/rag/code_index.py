@@ -4,6 +4,8 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from vibecli.textio import read_text_file
+
 TEXT_SUFFIXES = {
     ".py",
     ".ts",
@@ -55,7 +57,7 @@ class CodeIndex:
             for file_path in files:
                 rel = str(file_path.relative_to(self.root))
                 try:
-                    lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    lines = read_text_file(file_path)[0].splitlines()
                 except OSError:
                     continue
                 for line_number, line in enumerate(lines, start=1):
