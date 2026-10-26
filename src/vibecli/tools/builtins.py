@@ -120,7 +120,11 @@ def get_builtin_tools() -> list[Tool]:
         ),
         Tool(
             name="bash",
-            description="Execute a shell command in the current workspace.",
+            description=(
+                "Execute a shell command in the current workspace. Runs through a POSIX "
+                "shell (bash/sh) when one is available, otherwise the platform default. "
+                "Prefer portable commands and quote paths containing spaces."
+            ),
             parameters=object_schema(
                 {
                     "command": {"type": "string", "description": "Shell command"},
@@ -137,7 +141,10 @@ def get_builtin_tools() -> list[Tool]:
         ),
         Tool(
             name="execute_command",
-            description="Alias of bash. Execute a shell command in the current workspace.",
+            description=(
+                "Alias of bash. Execute a shell command in the current workspace through "
+                "a POSIX shell (bash/sh) when one is available."
+            ),
             parameters=object_schema(
                 {
                     "command": {"type": "string", "description": "Shell command"},
