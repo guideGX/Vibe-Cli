@@ -37,6 +37,18 @@ def test_decode_chain_has_no_duplicate_entries() -> None:
     assert len({item.lower() for item in chain}) == len(chain)
 
 
+def test_decode_chain_covers_chinese_encodings_everywhere() -> None:
+    """GBK 文件不只会出现在 Windows。
+
+    cp936 曾经被限定成「仅 Windows 入链」，于是 GBK 代码库在 Linux 上解不
+    出来 —— CI 的 ubuntu runner 第一次跑就红了。这里无条件断言，两个平台
+    都能防回归。
+    """
+    chain = {item.lower() for item in decode_chain()}
+    assert "cp936" in chain
+    assert "big5" in chain
+
+
 def test_mixed_stream_keeps_both_encodings() -> None:
     """一条命令里 Git Bash 写 UTF-8、cmd 写 GBK，两段都要能读。"""
     raw = "中文\n".encode() + b"Microsoft Windows [\xb0\xe6\xb1\xbe 10.0]\r\n"

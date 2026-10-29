@@ -11,7 +11,6 @@ Git Bash 写的 UTF-8、cmd 内建命令写的 GBK（系统 ANSI 代码页）、
 from __future__ import annotations
 
 import locale
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -35,11 +34,15 @@ def _ansi_encoding() -> str | None:
 
 @lru_cache(maxsize=1)
 def decode_chain() -> tuple[str, ...]:
-    """编码尝试顺序：UTF-8 优先，其次系统 ANSI 代码页，Windows 再兜 cp936。"""
+    """编码尝试顺序：UTF-8 优先，其次系统 ANSI 代码页，再兜常见中文编码。
+
+    cp936 / big5 无条件入链，**不限 Windows**：GBK 文件完全可能出现在
+    Linux 上（从 Windows 拷来的代码库、跨平台共享仓库）。把它们限定在
+    Windows 等于重复「GBK 只在 Windows 出现」这个假设 —— 正是本项目要修
+    的那类错。CI 的 ubuntu runner 第一次跑就抓出了这个。
+    """
     chain: list[str] = ["utf-8"]
-    fallbacks = [_ansi_encoding()]
-    if os.name == "nt":
-        fallbacks.append("cp936")
+    fallbacks = [_ansi_encoding(), "cp936", "big5"]
     for encoding in fallbacks:
         if encoding and encoding.lower() not in {item.lower() for item in chain}:
             chain.append(encoding)
