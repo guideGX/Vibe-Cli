@@ -34,18 +34,20 @@ def _ansi_encoding() -> str | None:
 
 @lru_cache(maxsize=1)
 def decode_chain() -> tuple[str, ...]:
-    """编码尝试顺序：UTF-8 优先，其次系统 ANSI 代码页，再兜常见中文编码。
+    """编码尝试顺序：UTF-8 → 常见中文编码 → 系统 ANSI 代码页。
+
+    中文编码必须排在 locale 前面。cp1252 / latin-1 这类宽松编码对几乎任何
+    字节序列都能「成功」解码，一旦排在前面就会抢走 GBK 的机会：英文 Windows
+    （GitHub 的 windows runner 就是）系统 ANSI 代码页是 1252 而不是 936，
+    实测整条链停在 1252，GBK 文件被解成乱码。宽松编码只配当兜底。
 
     cp936 / big5 无条件入链，**不限 Windows**：GBK 文件完全可能出现在
-    Linux 上（从 Windows 拷来的代码库、跨平台共享仓库）。把它们限定在
-    Windows 等于重复「GBK 只在 Windows 出现」这个假设 —— 正是本项目要修
-    的那类错。CI 的 ubuntu runner 第一次跑就抓出了这个。
+    Linux 上（从 Windows 拷来的代码库、跨平台共享仓库）。
     """
-    chain: list[str] = ["utf-8"]
-    fallbacks = [_ansi_encoding(), "cp936", "big5"]
-    for encoding in fallbacks:
-        if encoding and encoding.lower() not in {item.lower() for item in chain}:
-            chain.append(encoding)
+    chain: list[str] = ["utf-8", "cp936", "big5"]
+    ansi = _ansi_encoding()
+    if ansi and ansi.lower() not in {item.lower() for item in chain}:
+        chain.append(ansi)
     return tuple(chain)
 
 

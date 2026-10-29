@@ -49,6 +49,19 @@ def test_decode_chain_covers_chinese_encodings_everywhere() -> None:
     assert "big5" in chain
 
 
+def test_lenient_locale_encodings_never_outrank_chinese_ones() -> None:
+    """cp1252 不能排在 cp936 前面。
+
+    GitHub 的 windows runner 是英文系统，ANSI 代码页是 1252。而 cp1252 对
+    几乎任何字节都能「成功」解码，排在前面就会抢走 GBK 的机会 —— 第二次
+    CI 就是这样红的：本地中文 Windows 全绿，CI 上 GBK 全变乱码。
+    """
+    chain = [item.lower() for item in decode_chain()]
+    if "cp1252" not in chain:
+        return
+    assert chain.index("cp936") < chain.index("cp1252")
+
+
 def test_mixed_stream_keeps_both_encodings() -> None:
     """一条命令里 Git Bash 写 UTF-8、cmd 写 GBK，两段都要能读。"""
     raw = "中文\n".encode() + b"Microsoft Windows [\xb0\xe6\xb1\xbe 10.0]\r\n"
