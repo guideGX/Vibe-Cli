@@ -371,6 +371,61 @@ locale.getencoding()               = 'cp936'      # 真正想要的
 
 ---
 
+## 第三轮：CI 自己也是「环境」
+
+把 matrix 加进 CI 之后，这个仓库**第一次在 Linux 和英文 Windows 上跑测试**。结果是三轮才绿，而且两次红都是「环境假设」被抓——**抓的是我自己刚写下去的假设**。
+
+| 轮次 | 结果 | 根因 |
+| --- | --- | --- |
+| `a9e243a`（PR #1 合并） | ubuntu + windows **双红**，Lint 过、Test 挂 | `decode_chain()` 里 `if os.name == "nt"` 才把 cp936 入链 |
+| `0afe505` | ubuntu 绿、**windows 红** | locale 编码排在 cp936 前面 |
+| `dd514ce` | **双绿**，115 passed | cp936 / big5 前移，宽松编码退到兜底 |
+
+### 第一轮红：GBK 不是 Windows 独有
+
+```python
+if os.name == "nt":
+    fallbacks.append("cp936")      # ← 这就是本分支要消除的那类假设
+```
+
+GBK 文件完全可能出现在 Linux 上：从 Windows 拷来的代码库、跨平台共享仓库、挂载的卷。把它们限定在 Windows，等于重复了一遍「GBK 只在 Windows 出现」。
+
+### 第二轮红：本地全绿，CI 全红
+
+这次最值得记。**我的机器是中文 Windows，115 passed；GitHub 的 windows runner 是英文系统，同一份测试全挂。**
+
+差别只有一个：**系统 ANSI 代码页**。
+
+| 环境 | `locale.getencoding()` |
+| --- | --- |
+| 我的机器（中文 Windows） | `cp936` |
+| GitHub windows runner（英文） | `cp1252` |
+
+而当时的解码链是 `utf-8 → locale → cp936 → big5`。在 runner 上它变成：
+
+```
+utf-8(失败) → cp1252(成功，但解出来是乱码)
+```
+
+**cp1252 / latin-1 这类宽松编码对几乎任何字节序列都能「成功」解码**，所以它们一旦排在前面，就会静默抢走精确编码的机会。这不是 GBK 特有的问题——任何非 ASCII 内容都会被它们毁掉。
+
+修法是把顺序倒过来：
+
+```python
+chain = ["utf-8", "cp936", "big5"]     # 精确优先
+if ansi not in chain: chain.append(ansi)  # 宽松编码只配当兜底
+```
+
+配套的测试也带了条件：`test_lenient_locale_encodings_never_outrank_chinese_ones` 只在链里真出现 cp1252 时断言顺序——在中文系统上它是空转，在英文系统上才真正生效。**一个测试在开发者机器上永远是 no-op，那它保护的就是 CI 而不是开发者。**
+
+### 这一轮的可迁移教训
+
+1. **CI runner 的环境也是「环境假设」。** 「Windows」不是一种环境——中文 Windows 和英文 Windows 的代码页不同，行为就不同。同一个 OS 名称底下是一整张环境矩阵。
+2. **宽松编码是解码链里的毒药。** cp1252 / latin-1 几乎不报错，所以它们的位置必须是最后。凡是「几乎不会失败」的兜底项，都要警惕它是不是在掩盖真正的答案。
+3. **本地全绿 ≠ CI 全绿，即使操作系统相同。** 差别往往不在代码，在 locale、时区、代码页、预装工具这些「默认值」里。
+
+---
+
 ## 遗留
 
 | 项 | 状态 |
